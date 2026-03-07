@@ -35,7 +35,11 @@ from app.services import (
     rank_service,
     features_service,
     block_lists_service,
-    screenshot_service
+    screenshot_service,
+    redirect_chain_service,
+    ai_analyzer_service,
+    malware_check_service,
+    url_parser_service
 )
 
 logger = logging.getLogger(__name__)
@@ -321,6 +325,48 @@ def screenshot():
     return screenshot_service.get_screenshot(url)
 
 
+@bp.route('/redirect-chain', methods=['GET'])
+@check_rate_limit
+@api_handler
+def redirect_chain():
+    """Deep redirect chain analysis with hop classification and risk scoring"""
+    url = get_url_param()
+    return redirect_chain_service.analyze_redirect_chain(url)
+
+
+@bp.route('/url-parse', methods=['GET'])
+@check_rate_limit
+@api_handler
+def url_parse():
+    """Parse URL structure and detect suspicious patterns"""
+    url = get_url_param()
+    return url_parser_service.parse_url(url)
+
+
+@bp.route('/malware-check', methods=['GET'])
+@check_rate_limit
+@api_handler
+def malware_check():
+    """Check URL against malware and phishing databases"""
+    url = get_url_param()
+    return malware_check_service.check_malware(url)
+
+
+@bp.route('/ai-analyze', methods=['GET'])
+@check_rate_limit
+@api_handler
+def ai_analyze():
+    """AI-powered security analysis of URL redirect chain using Gemini"""
+    url = get_url_param()
+    chain_result = redirect_chain_service.analyze_redirect_chain(url)
+    ai_report = ai_analyzer_service.ai_analyze(url, chain_result)
+    return {
+        'url': url,
+        'redirect_chain_analysis': chain_result,
+        'ai_report': ai_report
+    }
+
+
 @bp.route('/', methods=['GET'])
 def api_index():
     """API index - list all endpoints"""
@@ -356,6 +402,10 @@ def api_index():
         'block-lists': '/api/web-analyzer/block-lists?url=example.com',
         'screenshot': '/api/web-analyzer/screenshot?url=example.com',
         'batch': '/api/web-analyzer/batch?url=example.com',
+        'redirect-chain': '/api/web-analyzer/redirect-chain?url=example.com',
+        'url-parse': '/api/web-analyzer/url-parse?url=example.com',
+        'malware-check': '/api/web-analyzer/malware-check?url=example.com',
+        'ai-analyze': '/api/web-analyzer/ai-analyze?url=example.com',
     }
     
     return jsonify({

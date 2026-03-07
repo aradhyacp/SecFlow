@@ -31,7 +31,11 @@ from . import (
     rank_service,
     features_service,
     block_lists_service,
-    screenshot_service
+    screenshot_service,
+    redirect_chain_service,
+    ai_analyzer_service,
+    malware_check_service,
+    url_parser_service
 )
 
 __all__ = [
@@ -64,5 +68,9 @@ __all__ = [
     'rank_service',
     'features_service',
     'block_lists_service',
-    'screenshot_service'
+    'screenshot_service',
+    'redirect_chain_service',
+    'ai_analyzer_service',
+    'malware_check_service',
+    'url_parser_service'
 ]

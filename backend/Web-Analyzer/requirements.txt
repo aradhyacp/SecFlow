@@ -18,4 +18,5 @@ idna
 # Additional dependencies for new services
 selenium
 webdriver-manager
+google-genai
 
