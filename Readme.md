@@ -131,7 +131,7 @@ secflow/
 | [docs/architecture.md](docs/architecture.md) | System component and data-flow architecture |
 | [docs/pipeline-flow.md](docs/pipeline-flow.md) | Detailed pipeline loop logic |
 | [docs/analyzers.md](docs/analyzers.md) | Per-analyzer capability and interface spec |
-| [docs/migration.md](docs/migration.md) | Guide for incorporating old analyzer microservices |
+| [docs/migration.md](docs/migration.md) | Integration guide for the analyzer microservices |
 | [backend/Readme.md](backend/Readme.md) | Backend setup and development guide |
 | [frontend/Readme.md](frontend/Readme.md) | Frontend setup and development guide |
 

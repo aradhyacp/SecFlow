@@ -1,6 +1,6 @@
 # SecFlow — Backend
 
-The backend is a **multi-service Docker Compose application** comprising six microservices: five analyzer services (migrated from the old project) and one new Orchestrator service that runs the AI pipeline loop.
+The backend is a **multi-service Docker Compose application** comprising six microservices: five analyzer services and one Orchestrator service that runs the AI pipeline loop.
 
 ---
 
@@ -48,11 +48,11 @@ backend/
 │   ├── requirements.txt
 │   └── .env.example
 │
-├── malware-analyzer/                    ← FROM OLD PROJECT (no changes)
-├── steg-analyzer/                       ← FROM OLD PROJECT (no changes)
-├── recon-analyzer/                      ← FROM OLD PROJECT (no changes)
-├── url-analyzer/                        ← FROM OLD PROJECT (internal only)
-├── web-analyzer/                        ← FROM OLD PROJECT (no changes)
+├── malware-analyzer/                    ← Analyzer microservice
+├── steg-analyzer/                       ← Analyzer microservice
+├── recon-analyzer/                      ← Analyzer microservice
+├── url-analyzer/                        ← Analyzer microservice (internal only)
+├── web-analyzer/                        ← Analyzer microservice
 │
 ├── compose.yml                          ← Orchestrates all 6 services
 └── .env.example                         ← Root env vars (GEMINI_API_KEY etc.)
