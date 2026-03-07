@@ -1,0 +1,26 @@
+name: Brand Name Guard
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  block-legacy-brand:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+      uses: actions/checkout@v4
+
+      - name: Fail if deprecated brand name exists
+      shell: bash
+      run: |
+        set -euo pipefail
+        LEGACY_BRAND_PATTERN='[iI][nN][tT][eE][lL][xX]'
+        if grep -R -n -E "${LEGACY_BRAND_PATTERN}" . \
+          --exclude-dir=.git \
+          --exclude-dir=node_modules \
+          --exclude-dir=frontend/node_modules; then
+          echo "Found deprecated brand references. Replace with 'secflow'."
+          exit 1
+        fi
+        echo "No deprecated brand references found."

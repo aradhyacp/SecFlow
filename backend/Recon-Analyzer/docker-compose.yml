@@ -19,9 +19,9 @@ services:
       retries: 3
       start_period: 10s
     networks:
-      - intelx-network
+      - secflow-network
 
 networks:
-  intelx-network:
+  secflow-network:
     driver: bridge
-    name: intelx-network
+    name: secflow-network
