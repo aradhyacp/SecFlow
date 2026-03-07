@@ -32,7 +32,7 @@
           "pass_number": { "type": "integer", "minimum": 1 },
           "analyzer": {
             "type": "string",
-            "enum": ["malware", "steg", "recon", "web", "url", "classifier"]
+            "enum": ["malware", "steg", "recon", "web", "url", "classifier", "macro"]
           },
           "findings": {
             "type": "array",
@@ -57,6 +57,87 @@
       "type": "array",
       "items": { "type": "string" },
       "description": "Actionable remediation steps based on the findings"
+    },
+    "threat_intel": {
+      "type": "object",
+      "description": "AI-generated threat intelligence: summary, YARA rules, SIGMA rules",
+      "properties": {
+        "model":     { "type": "string" },
+        "error":     { "type": ["string", "null"] },
+        "threat_summary": {
+          "type": "object",
+          "properties": {
+            "threat_name":       { "type": "string" },
+            "threat_actor_type": { "type": "string" },
+            "attack_vector":     { "type": "string" },
+            "attack_chain":      { "type": "array", "items": { "type": "string" } },
+            "severity":          { "type": "string" },
+            "confidence":        { "type": "string" },
+            "reasoning":         { "type": "string" },
+            "iocs": {
+              "type": "object",
+              "properties": {
+                "hashes":     { "type": "array", "items": { "type": "string" } },
+                "ips":        { "type": "array", "items": { "type": "string" } },
+                "domains":    { "type": "array", "items": { "type": "string" } },
+                "urls":       { "type": "array", "items": { "type": "string" } },
+                "file_names": { "type": "array", "items": { "type": "string" } }
+              }
+            },
+            "mitre_ttps": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id":     { "type": "string" },
+                  "name":   { "type": "string" },
+                  "tactic": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "yara": {
+          "type": "object",
+          "properties": {
+            "reasoning":   { "type": "string" },
+            "total_rules": { "type": "integer" },
+            "rules": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "rule_name":   { "type": "string" },
+                  "description": { "type": "string" },
+                  "reasoning":   { "type": "string" },
+                  "tags":        { "type": "array", "items": { "type": "string" } },
+                  "rule_text":   { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "sigma": {
+          "type": "object",
+          "properties": {
+            "reasoning":   { "type": "string" },
+            "total_rules": { "type": "integer" },
+            "rules": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "rule_name":   { "type": "string" },
+                  "description": { "type": "string" },
+                  "log_source":  { "type": "string" },
+                  "reasoning":   { "type": "string" },
+                  "rule_text":   { "type": "string" }
+                }
+              }
+            }
+          }
+        }
+      }
     }
   }
 }
