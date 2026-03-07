@@ -6,7 +6,7 @@ This document specifies each of SecFlow's four analyzers: their purpose, inputs,
 
 ## Common Interface
 
-Each analyzer is an **independent Docker microservice** (from the old project). The Orchestrator never imports analyzer code — it always calls via HTTP.
+Each analyzer is an **independent Docker microservice**. The Orchestrator never imports analyzer code — it always calls via HTTP.
 
 | Analyzer | Docker service | Port | Transport | Input |
 |---|---|---|---|---|

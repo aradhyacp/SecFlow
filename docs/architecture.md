@@ -87,11 +87,11 @@
 - **Output:** `{ "next_tool": str | null, "reasoning": str }`.
 
 ### Adapters
-- **Role:** Translation layer between each old analyzer's native response format and the SecFlow findings contract.
+- **Role:** Translation layer between each analyzer's native response format and the SecFlow findings contract.
 - **Location:** `orchestrator/app/adapters/<name>_adapter.py` — one per analyzer.
-- **Why they exist:** Old analyzer services return their own JSON shapes. Adapters absorb format differences without touching analyzer code.
+- **Why they exist:** Analyzer services return their own JSON shapes. Adapters absorb format differences without touching analyzer code.
 
-### Analyzer Services (OLD PROJECT — 5 containers)
+### Analyzer Services (5 containers)
 Each is an independent Docker microservice called by the Orchestrator via HTTP POST.
 
 | Service | Port | Transport | Input |

@@ -25,7 +25,7 @@ This document is the hands-on engineering reference for building SecFlow's backe
 
 ## 1. Project Structure
 
-SecFlow uses a **microservices layout**. The five analyzer services come from the old project unchanged; the new Orchestrator service is the only net-new Docker container.
+SecFlow uses a **microservices layout**. The five analyzer services run as independent Docker containers; the Orchestrator service coordinates them via HTTP.
 
 ```
 backend/
@@ -40,7 +40,7 @@ backend/
 │   │   ├── ai/
 │   │   │   ├── engine.py
 │   │   │   └── keywords.txt
-│   │   ├── adapters/                ← Translate old analyzer JSON → SecFlow contract
+│   │   ├── adapters/                ← Translate analyzer JSON → SecFlow contract
 │   │   │   ├── malware_adapter.py
 │   │   │   ├── steg_adapter.py
 │   │   │   ├── recon_adapter.py
@@ -55,11 +55,11 @@ backend/
 │   ├── requirements.txt
 │   └── .env.example
 │
-├── malware-analyzer/                ← FROM OLD PROJECT (Docker, port 5001)
-├── steg-analyzer/                   ← FROM OLD PROJECT (Docker, port 5002)
-├── recon-analyzer/                  ← FROM OLD PROJECT (Docker, port 5003)
-├── url-analyzer/                    ← FROM OLD PROJECT (Docker, port 5004, internal)
-├── web-analyzer/                    ← FROM OLD PROJECT (Docker, port 5005)
+├── malware-analyzer/                ← Analyzer microservice (Docker, port 5001)
+├── steg-analyzer/                   ← Analyzer microservice (Docker, port 5002)
+├── recon-analyzer/                  ← Analyzer microservice (Docker, port 5003)
+├── url-analyzer/                    ← Analyzer microservice (Docker, port 5004, internal)
+├── web-analyzer/                    ← Analyzer microservice (Docker, port 5005)
 │
 └── compose.yml                      ← Wires all 6 services on secflow-net
 
@@ -342,11 +342,11 @@ print(analyzer)   # "recon"
 
 ## 6. Malware Analyzer
 
-> **Note:** This service exists in the old project (`backend/malware-analyzer/`). Do not modify the service code — write a `malware_adapter.py` instead. The snippet below is reference-only for understanding what the service does internally.
+> **Note:** Do not modify the service code — write a `malware_adapter.py` instead. The snippet below is reference-only for understanding what the service does internally.
 
 **Service endpoint:** `POST http://malware-analyzer:5001/api/malware-analyzer/` (file upload)
 
-**File:** `backend/malware-analyzer/<main_module>.py` (from old project)
+**File:** `backend/malware-analyzer/<main_module>.py`
 
 ```python
 import hashlib
@@ -518,11 +518,11 @@ def run(input_data: str, pass_number: int) -> dict[str, Any]:
 
 ## 7. Steganography Analyzer
 
-> **Note:** This service exists in the old project (`backend/steg-analyzer/`). Do not modify the service code — write a `steg_adapter.py` instead. The snippet below is reference-only for understanding what the service does internally.
+> **Note:** Do not modify the service code — write a `steg_adapter.py` instead. The snippet below is reference-only for understanding what the service does internally.
 
 **Service endpoint:** `POST http://steg-analyzer:5002/api/steg-analyzer/` (file upload)
 
-**File:** `backend/steg-analyzer/<main_module>.py` (from old project)
+**File:** `backend/steg-analyzer/<main_module>.py`
 
 ```python
 import subprocess
@@ -644,11 +644,11 @@ def run(input_data: str, pass_number: int) -> dict[str, Any]:
 
 ## 8. Reconnaissance Analyzer
 
-> **Note:** This service exists in the old project (`backend/recon-analyzer/`). Do not modify the service code — write a `recon_adapter.py` instead. The snippet below is reference-only for understanding what the service does internally.
+> **Note:** Do not modify the service code — write a `recon_adapter.py` instead. The snippet below is reference-only for understanding what the service does internally.
 
 **Service endpoint:** `POST http://recon-analyzer:5003/api/recon-analyzer/` (JSON body)
 
-**File:** `backend/recon-analyzer/<main_module>.py` (from old project)
+**File:** `backend/recon-analyzer/<main_module>.py`
 
 ```python
 import os
@@ -804,11 +804,11 @@ def run(input_data: str, pass_number: int) -> dict[str, Any]:
 
 ## 9. Web Vulnerability Analyzer
 
-> **Note:** This service exists in the old project (`backend/web-analyzer/`). Do not modify the service code — write a `web_adapter.py` instead. The snippet below is reference-only for understanding what the service does internally.
+> **Note:** Do not modify the service code — write a `web_adapter.py` instead. The snippet below is reference-only for understanding what the service does internally.
 
 **Service endpoint:** `POST http://web-analyzer:5005/api/web-analyzer/` (JSON body)
 
-**File:** `backend/web-analyzer/<main_module>.py` (from old project)
+**File:** `backend/web-analyzer/<main_module>.py`
 
 ```python
 import os
