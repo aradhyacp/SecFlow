@@ -30,6 +30,7 @@ services:
       - STEG_ANALYZER_URL=http://steg-analyzer:5000/api/steg-analyzer
       - RECON_ANALYZER_URL=http://recon-analyzer:5000/api/Recon-Analyzer
       - WEB_ANALYZER_URL=http://web-analyzer:5000/api/web-analyzer
+      - MACRO_ANALYZER_URL=http://macro-analyzer:5000/api/macro-analyzer
       - MAX_PASSES=${MAX_PASSES:-3}
       - PYTHONUNBUFFERED=1
     volumes:
@@ -42,6 +43,8 @@ services:
       recon-analyzer:
         condition: service_healthy
       web-analyzer:
+        condition: service_started
+      macro-analyzer:
         condition: service_started
     networks:
       - secflow-net
@@ -201,6 +204,27 @@ services:
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/api/Recon-Analyzer/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # ── Macro Analyzer ───────────────────────────────────────────────────────────
+  macro-analyzer:
+    build:
+      context: ./macro-analyzer
+      dockerfile: Dockerfile
+    container_name: macro-analyzer
+    ports:
+      - "5006:5000"
+    environment:
+      - PORT=5000
+      - PYTHONUNBUFFERED=1
+    networks:
+      - secflow-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/api/macro-analyzer/health"]
       interval: 30s
       timeout: 10s
       retries: 3
