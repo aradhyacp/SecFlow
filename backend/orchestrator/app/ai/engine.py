@@ -26,7 +26,7 @@ from openai import OpenAI
 
 log = logging.getLogger("secflow.ai_engine")
 
-ANALYZER_NAMES = ["malware", "steg", "recon", "web"]
+ANALYZER_NAMES = ["malware", "steg", "recon", "web", "macro"]
 KEYWORDS_FILE = Path(__file__).parent / "keywords.txt"
 MAX_CONTEXT_CHARS = 3000
 
@@ -262,8 +262,9 @@ As a SOC analyst, decide the single best NEXT analysis step based on the artifac
 3. If `recon` just ran on a domain and `web` has NOT run → `"web"` with `"https://<domain>"` as target
 4. If `web` just ran on a URL and `recon` has NOT run → `"recon"` with the bare hostname (no https://) as target
 5. If an extracted/embedded file path is found → `"malware"` or `"steg"` depending on type
-6. If `{current_tool}` found domains/IPs inside decompiled code or data strings → treat as artifacts and apply rules 1-4
-7. If no passes remain or no new useful artifacts → `null`
+6. If `{current_tool}` found domains/IPs inside decompiled code or data strings / VBA macros → treat as artifacts and apply rules 1-4
+7. If `macro` just ran and IOCs contain URLs/IPs/domains → apply rules 1-2 to those IOCs
+8. If no passes remain or no new useful artifacts → `null`
 
 **IMPORTANT:**
 - `target` must be the **exact string** to pass to the next analyzer (full URL for web, bare domain/IP for recon, file path for malware/steg)
@@ -272,7 +273,7 @@ As a SOC analyst, decide the single best NEXT analysis step based on the artifac
 
 Respond ONLY with a JSON object — no markdown, no code fences, no extra text:
 {{
-  "next_tool": "<malware | steg | recon | web | null>",
+  "next_tool": "<malware | steg | recon | web | macro | null>",
   "target": "<exact value to analyze, or null if next_tool is null>",
   "reasoning": "<one sentence explaining the decision>"
 }}"""
