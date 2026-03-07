@@ -41,7 +41,7 @@ import requests
 from app.classifier.classifier import classify, get_file_head
 from app.ai.engine import decide_next
 from app.store.findings_store import FindingsStore
-from app.adapters import malware_adapter, steg_adapter, recon_adapter, url_adapter, web_adapter
+from app.adapters import malware_adapter, steg_adapter, recon_adapter, url_adapter, web_adapter, macro_adapter
 
 log = logging.getLogger("secflow.orchestrator")
 
@@ -50,6 +50,7 @@ _MALWARE_BASE = os.getenv("MALWARE_ANALYZER_URL", "http://malware-analyzer:5000/
 _STEG_BASE    = os.getenv("STEG_ANALYZER_URL",    "http://steg-analyzer:5000/api/steg-analyzer")
 _RECON_BASE   = os.getenv("RECON_ANALYZER_URL",   "http://recon-analyzer:5000/api/Recon-Analyzer")
 _WEB_BASE     = os.getenv("WEB_ANALYZER_URL",     "http://web-analyzer:5000/api/web-analyzer")
+_MACRO_BASE   = os.getenv("MACRO_ANALYZER_URL",   "http://macro-analyzer:5000/api/macro-analyzer")
 
 # Steg-Analyzer async polling settings
 _STEG_POLL_INTERVAL = 3   # seconds between status checks
@@ -185,6 +186,24 @@ def _call_recon(query: str, pass_number: int) -> dict[str, Any]:
     return recon_adapter.adapt(raw, pass_number, query)
 
 
+def _call_macro(file_path: str, pass_number: int) -> dict[str, Any]:
+    """Call macro-analyzer: POST /analyze with the uploaded file, then adapt."""
+    try:
+        with open(file_path, "rb") as f:
+            r = requests.post(
+                f"{_MACRO_BASE}/analyze",
+                files={"file": f},
+                timeout=60,
+            )
+        r.raise_for_status()
+        raw = r.json()
+        log.info(f"[macro] Analysis complete for {file_path}, risk_level={raw.get('risk_level')}")
+    except Exception as e:
+        log.error(f"[macro] Call failed: {e}")
+        raw = {}
+    return macro_adapter.adapt(raw, pass_number, file_path)
+
+
 def _call_web(url: str, pass_number: int) -> dict[str, Any]:
     """
     Call the security-critical subset of Web-Analyzer GET endpoints.
@@ -236,6 +255,7 @@ _CALLER_MAP = {
     "steg":    _call_steg,
     "recon":   _call_recon,
     "web":     _call_web,
+    "macro":   _call_macro,
 }
 
 
