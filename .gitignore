@@ -1,0 +1,64 @@
+# General
+.DS_Store
+.idea/
+.vscode/
+*.log
+*.swp
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Testing
+.coverage
+htmlcov/
+.pytest_cache/
+
+# Environments
+.env
+.flaskenv
+
+# Docker
+docker-compose.override.yml
+
+# Project Specific
+# Steg-Analyzer results and temp files
+**/Steg-Analyzer/secflow/results/
+**/Steg-Analyzer/secflow/removed_images/
+**/Steg-Analyzer/secflow/uploads/
+
+# Malware-Analyzer uploads
+**/Malware-Analyzer/uploads/
+**/Malware-Analyzer/temp/
+
+# Web-Analyzer
+**/Web-Analyzer/instance/
+**/Web-Analyzer/migrations/
+
+# General Output/Uploads
+**/uploads/
+**/results/
+**/output/
+**/test_output.txt
+**/temp/

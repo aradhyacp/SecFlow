@@ -1,0 +1,86 @@
+services:
+  web:
+    build: .
+    container_name: secflow-web
+    restart: always
+    command: ["gunicorn", "-w", "4", "-b", "0.0.0.0:5000", "secflow.utils.wsgi:application"]
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./secflow:/app/secflow
+    depends_on:
+      postgres:
+        condition: service_healthy
+      initdb:
+        condition: service_completed_successfully
+      redis:
+        condition: service_started
+      worker:
+        condition: service_started
+    env_file:
+      - .env.example
+
+  worker:
+    build: .
+    container_name: secflow-worker
+    restart: always
+    command: rq worker default --url redis://redis:6379/0
+    volumes:
+      - ./secflow:/app/secflow
+    depends_on:
+      postgres:
+        condition: service_healthy
+      initdb:
+        condition: service_completed_successfully
+      redis:
+        condition: service_started
+    env_file:
+      - .env.example
+
+  initdb:
+    build: .
+    container_name: secflow-initdb
+    command: python -m secflow.utils.init_db
+    volumes:
+      - ./secflow:/app/secflow
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - .env.example
+    restart: "no"
+
+  redis:
+    image: redis:7
+    container_name: redis
+    restart: always
+    env_file:
+      - .env.example
+
+  postgres:
+    image: postgres:14
+    container_name: postgres
+    restart: always
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U secflowuser -d secflow"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    env_file:
+      - .env.example
+
+  rqdashboard:
+    image: eoranged/rq-dashboard
+    container_name: rq-dashboard
+    restart: always
+    ports:
+      - "9181:9181"
+    depends_on:
+      - redis
+    env_file:
+      - .env.example
+
+volumes:
+  pgdata:

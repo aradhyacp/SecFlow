@@ -116,11 +116,11 @@ The report includes:
 | **API Framework** | Flask (Python 3.11+) |
 | **File Classification** | `file` (system command), `python-magic` |
 | **AI Orchestration** | Google Gemini API (tool-calling) |
-| **Malware Analysis** | Existing microservice — YARA, pefile, strings, hashlib (from old project) |
-| **Steganography** | Existing microservice — binwalk, zsteg, steghide, ExifTool (from old project) |
-| **Reconnaissance** | Existing microservice — nmap, WHOIS, dnspython, Shodan (from old project) |
-| **URL Analysis** | Existing microservice — internal only, no public route (from old project) |
-| **Web Vulnerability** | Existing microservice — requests, Wappalyzer (from old project) |
+| **Malware Analysis** | Analyzer microservice — YARA, pefile, strings, hashlib |
+| **Steganography** | Analyzer microservice — binwalk, zsteg, steghide, ExifTool |
+| **Reconnaissance** | Analyzer microservice — nmap, WHOIS, dnspython, Shodan |
+| **URL Analysis** | Analyzer microservice — internal only, no public route |
+| **Web Vulnerability** | Analyzer microservice — requests, Wappalyzer |
 | **Reporting** | PWNDoc — fpdf2 (PDF), Jinja2 (HTML), JSON |
 | **Frontend** | TBD (planned for later phase) |
 

@@ -1,16 +1,16 @@
-# SecFlow — Migration Guide
+# SecFlow — Integration Guide
 
-Incorporating the existing analyzer microservices into the new SecFlow pipeline.
+Setting up the analyzer microservices alongside the new SecFlow pipeline.
 
 ---
 
 ## Table of Contents
 
-1. [Migration Strategy](#1-migration-strategy)
+1. [Integration Strategy](#1-integration-strategy)
 2. [Architecture Decision — Why Keep Microservices](#2-architecture-decision--why-keep-microservices)
 3. [New Project Structure](#3-new-project-structure)
 4. [What Changes vs What Stays the Same](#4-what-changes-vs-what-stays-the-same)
-5. [Step-by-Step Migration Tasks](#5-step-by-step-migration-tasks)
+5. [Step-by-Step Setup Tasks](#5-step-by-step-setup-tasks)
 6. [The Orchestrator Service (New)](#6-the-orchestrator-service-new)
 7. [The Adapter Pattern](#7-the-adapter-pattern)
 8. [Updated compose.yml](#8-updated-composeyml)
@@ -21,9 +21,9 @@ Incorporating the existing analyzer microservices into the new SecFlow pipeline.
 
 ---
 
-## 1. Migration Strategy
+## 1. Integration Strategy
 
-The old project had **5 independent analyzer microservices**, each running in its own Docker container. The simple migration path is:
+SecFlow uses **5 independent analyzer microservices**, each running in its own Docker container. The integration approach is:
 
 > **Keep the analyzers exactly as they are. Add one new Docker service — the Orchestrator — that calls them via HTTP.**
 
@@ -81,11 +81,11 @@ backend/
 │   ├── requirements.txt
 │   └── .env.example
 │
-├── malware-analyzer/                    ← FROM OLD PROJECT (no changes)
-├── steg-analyzer/                       ← FROM OLD PROJECT (no changes)
-├── recon-analyzer/                      ← FROM OLD PROJECT (no changes)
-├── url-analyzer/                        ← FROM OLD PROJECT (internal only)
-├── web-analyzer/                        ← FROM OLD PROJECT (no changes)
+├── malware-analyzer/                    ← Analyzer microservice
+├── steg-analyzer/                       ← Analyzer microservice
+├── recon-analyzer/                      ← Analyzer microservice
+├── url-analyzer/                        ← Analyzer microservice (internal only)
+├── web-analyzer/                        ← Analyzer microservice
 │
 ├── compose.yml                          ← UPDATED: adds orchestrator service
 ├── .env.example                         ← UPDATED: adds GEMINI_API_KEY
@@ -107,7 +107,7 @@ backend/
 
 ## 4. What Changes vs What Stays the Same
 
-### Stays the Same (Old Project)
+### Stays the Same
 - All 5 analyzer service directories — no code changes required
 - Each analyzer's `Dockerfile`
 - Each analyzer's `requirements.txt`
@@ -124,22 +124,21 @@ backend/
 
 ---
 
-## 5. Step-by-Step Migration Tasks
+## 5. Step-by-Step Setup Tasks
 
-### Task 1 — Copy Old Project Into New Repo
+### Task 1 — Verify Analyzer Directory Structure
 
-```bash
-# From the old project root, copy each analyzer directory:
-cp -r old-project/Malware-Analyzer  backend/malware-analyzer
-cp -r old-project/Recon-Analyzer    backend/recon-analyzer
-cp -r old-project/Steg-Analyzer     backend/steg-analyzer
-cp -r old-project/Url-Analyzer      backend/url-analyzer
-cp -r old-project/Web-Analyzer      backend/web-analyzer
+Ensure all analyzer directories are present under `backend/` with lowercase kebab-case names:
+
+```
+backend/malware-analyzer/
+backend/recon-analyzer/
+backend/steg-analyzer/
+backend/url-analyzer/
+backend/web-analyzer/
 ```
 
-Normalize directory names to lowercase kebab-case to match the new structure.
-
-### Task 2 — Verify All Old Services Start
+### Task 2 — Verify All Services Start
 
 ```bash
 cd backend
@@ -171,7 +170,7 @@ Document each service's exact request/response format — you will need this for
 
 ### Task 3 — Understand Each Analyzer's Response Format
 
-Before writing adapters, map out exactly what each analyzer returns. For example, if the old malware analyzer returns:
+Before writing adapters, map out exactly what each analyzer returns. For example, if the malware analyzer returns:
 ```json
 {
   "status": "success",
@@ -538,7 +537,7 @@ def adapt(raw_response: dict, pass_number: int, input_data: str) -> dict:
 
 ### Example: `malware_adapter.py`
 
-> Adjust field names to match whatever your old malware analyzer actually returns.
+> Adjust field names to match whatever your malware analyzer actually returns.
 
 ```python
 # backend/orchestrator/app/adapters/malware_adapter.py
@@ -869,7 +868,7 @@ Content-Type: application/json
 
 ## 10. URL Analyzer — What To Do With It
 
-The old project has a `url-analyzer` (port 5004) that is separate from `web-analyzer`. In SecFlow's new route structure, there is no standalone `/api/url-analyzer/` public route.
+The `url-analyzer` (port 5004) is separate from `web-analyzer`. In SecFlow's route structure, there is no standalone `/api/url-analyzer/` public route.
 
 **Recommended handling:**
 - Keep `url-analyzer` running as an internal service (it's in compose.yml)
@@ -920,8 +919,8 @@ WEB_ANALYZER_URL=http://web-analyzer:5005/api/web-analyzer/
 
 Work through this checklist after each migration phase:
 
-### Phase A — Old services verified
-- [ ] `docker compose up` brings up all 5 old analyzer containers
+### Phase A — Analyzer services verified
+- [ ] `docker compose up` brings up all 5 analyzer containers
 - [ ] Malware analyzer responds at `http://localhost:5001/api/malware-analyzer/`
 - [ ] Steg analyzer responds at `http://localhost:5002/api/steg-analyzer/`
 - [ ] Recon analyzer responds at `http://localhost:5003/api/recon-analyzer/`

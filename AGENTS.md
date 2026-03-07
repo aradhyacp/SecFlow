@@ -162,7 +162,7 @@ raw = {
 
 ### 5. Steganography Analyzer
 
-**Service location:** `backend/steg-analyzer/` (migrated from old project)
+**Service location:** `backend/steg-analyzer/`
 **Docker service:** `steg-analyzer` — runs at `http://steg-analyzer:5002/api/steg-analyzer/`
 **Responsibility:**
 - Analyzes image files for hidden/embedded data as an independent HTTP microservice.
@@ -179,7 +179,7 @@ requests.post("http://steg-analyzer:5002/api/steg-analyzer/", files={"file": ope
 
 ### 6. Reconnaissance Analyzer
 
-**Service location:** `backend/recon-analyzer/` (migrated from old project)
+**Service location:** `backend/recon-analyzer/`
 **Docker service:** `recon-analyzer` — runs at `http://recon-analyzer:5003/api/recon-analyzer/`
 **Responsibility:**
 - Performs OSINT and infrastructure reconnaissance on IPs, domains, and hostnames as an independent HTTP microservice.
@@ -196,7 +196,7 @@ requests.post("http://recon-analyzer:5003/api/recon-analyzer/", json={"target": 
 
 ### 7. Web Vulnerability Analyzer
 
-**Service location:** `backend/web-analyzer/` (migrated from old project)
+**Service location:** `backend/web-analyzer/`
 **Docker service:** `web-analyzer` — runs at `http://web-analyzer:5005/api/web-analyzer/`
 **Responsibility:**
 - Analyzes URLs and web endpoints for vulnerabilities and security misconfigurations as an independent HTTP microservice.
@@ -289,7 +289,7 @@ backend/
       ai/
         engine.py
         keywords.txt
-      adapters/                      ← Translate old analyzer responses → SecFlow contract
+      adapters/                      ← Translate analyzer responses → SecFlow contract
         malware_adapter.py
         steg_adapter.py
         recon_adapter.py
@@ -303,11 +303,11 @@ backend/
     Dockerfile
     requirements.txt
     .env.example
-  Malware-Analyzer/                  ← REAL SOURCE (Docker service, host port 5001, container port 5000)
-  steg-analyzer/                     ← FROM OLD PROJECT (Docker service, port 5002)
-  recon-analyzer/                    ← FROM OLD PROJECT (Docker service, port 5003)
-  url-analyzer/                      ← FROM OLD PROJECT (Docker service, port 5004, internal)
-  web-analyzer/                      ← FROM OLD PROJECT (Docker service, port 5005)
+  malware-analyzer/                  ← Analyzer microservice (Docker service, port 5001)
+  steg-analyzer/                     ← Analyzer microservice (Docker service, port 5002)
+  recon-analyzer/                    ← Analyzer microservice (Docker service, port 5003)
+  url-analyzer/                      ← Analyzer microservice (Docker service, port 5004, internal)
+  web-analyzer/                      ← Analyzer microservice (Docker service, port 5005)
   compose.yml                        ← Includes all 6 services
   .env.example
 ```
@@ -330,7 +330,7 @@ backend/
 ## References
 
 - [ProjectDetails.md](ProjectDetails.md) — Full project specification
-- [docs/migration.md](docs/migration.md) — Migration guide: incorporating old analyzer services
+- [docs/migration.md](docs/migration.md) — Integration guide: analyzer services setup
 - [docs/architecture.md](docs/architecture.md) — System architecture diagram (microservices)
 - [docs/pipeline-flow.md](docs/pipeline-flow.md) — Pipeline loop logic
 - [docs/analyzers.md](docs/analyzers.md) — Per-analyzer capability spec
