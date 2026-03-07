@@ -1,0 +1,22 @@
+Flask
+Flask-CORS
+python-dotenv
+requests
+dnspython
+cryptography
+lxml
+beautifulsoup4
+pyppeteer
+whois
+validators
+urllib3
+Werkzeug
+pyOpenSSL
+certifi
+chardet
+idna
+# Additional dependencies for new services
+selenium
+webdriver-manager
+google-genai
+

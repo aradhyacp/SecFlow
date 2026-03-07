@@ -72,18 +72,91 @@ SecFlow's runtime pipeline is composed of the following agents/workers:
 
 ### 4. Malware Analyzer
 
-**Service location:** `backend/malware-analyzer/`
-**Docker service:** `malware-analyzer` — runs at `http://malware-analyzer:5001/api/malware-analyzer/`
-**Responsibility:**
-- Analyzes executables, PE binaries, and extracted payloads as an independent HTTP microservice.
-- Performs static analysis: hash computation (MD5, SHA256), string extraction, YARA rule matching, PE header inspection.
-- Returns its own native JSON response; the Orchestrator's `malware_adapter.py` translates it to the SecFlow contract.
+**Service location:** `backend/Malware-Analyzer/` — source code lives here, directory name is capitalized
+**Docker service name:** `malware-analyzer`
+**Container port:** `5000` (internal); mapped to host port `5001` in SecFlow `compose.yml`
+**Internal Docker URL:** `http://malware-analyzer:5000/api/malware-analyzer/`
+**Base image:** `eclipse-temurin:21-jdk-jammy` — JDK 21 is mandatory for `pyghidra` to start the Ghidra JVM
+**Production server:** `gunicorn` with 2 workers, 300s timeout
 
-**How the Orchestrator calls it:**
+**Responsibility:**
+- Analyzes executables, PE binaries, and extracted binary payloads as an independent HTTP microservice.
+- Performs three-layer analysis: Ghidra 12.0.1 decompilation (via `pyghidra`), `objdump` disassembly, and VirusTotal API v3 threat intelligence.
+- Optionally generates a Gemini AI narrative summary or Mermaid execution-flow diagram.
+- Returns its own native JSON; the Orchestrator's `malware_adapter.py` translates it to the SecFlow contract.
+
+**Real API endpoints (all under `/api/malware-analyzer/`):**
+
+| Method | Route | Purpose |
+|---|---|---|
+| `GET` | `/health` | Health check — returns `{"status": "healthy"}` |
+| `POST` | `/decompile` | Ghidra decompilation + `objdump -d` disassembly |
+| `POST` | `/file-analysis` | VirusTotal API v3 upload + analysis report |
+| `POST` | `/ai-summary` | Ghidra + VT context → Gemini text summary |
+| `POST` | `/diagram-generator` | Ghidra + VT context → Gemini Mermaid flow diagram |
+
+> **There is no bare `POST /api/malware-analyzer/` route.** The orchestrator must call `/decompile` and `/file-analysis` individually.
+
+**How the Orchestrator calls it (two requests, merged before adapting):**
 ```python
-requests.post("http://malware-analyzer:5001/api/malware-analyzer/", files={"file": open(path, "rb")})
+# Call 1 — VirusTotal threat intel (timeout 60s)
+requests.post("http://malware-analyzer:5000/api/malware-analyzer/file-analysis",
+              files={"file": open(path, "rb")}, timeout=60)
+
+# Call 2 — Ghidra decompile + objdump (timeout 180s — Ghidra analysis is slow)
+requests.post("http://malware-analyzer:5000/api/malware-analyzer/decompile",
+              files={"file": open(path, "rb")}, timeout=180)
 ```
-**Output contract (after adapter):** `{ "analyzer": "malware", "pass": N, "findings": [...], "risk_score": 0-10 }`
+Both responses are merged into `{"vt": <file-analysis resp>, "decompile": <decompile resp>}` before being passed to `malware_adapter.adapt()`.
+
+**Supported file extensions:** `exe`, `dll`, `so`, `elf`, `bin`, `o`, `out`
+(Files with other extensions return HTTP 400. The orchestrator must rename extracted files to `.bin` if needed.)
+
+**Max file size:** 50 MB
+
+**Analysis tools used internally:**
+- `pyghidra==2.0.1` + Ghidra 12.0.1 — full decompilation and auto-analysis of all binary functions
+- `objdump -d` (binutils) — assembly-level disassembly
+- VirusTotal API v3 — 70+ AV engine detections, behavioral tags, file stats
+- `google-genai` (`gemini-3-flash-preview`) — AI summary and diagram (used only by `/ai-summary` and `/diagram-generator`; the orchestrator does NOT call these)
+
+**What this service does NOT use:** YARA rules, `pefile`, `hashlib`, `strings` command — these are in the planning docs only.
+
+**Required environment variables:**
+- `VIRUSTOTAL_API_KEY` — required for `/file-analysis`; endpoint fails gracefully if absent
+- `GEMINI_API_KEY` — required for `/ai-summary` and `/diagram-generator` only
+- `PORT` — defaults to `5000`
+
+**Resource requirements:** Memory limit **4 GB** minimum (Ghidra JVM is memory-heavy).
+
+**Adapter input shape:**
+```python
+# malware_adapter.adapt() receives:
+raw = {
+    "vt": {         # response from /file-analysis
+        "success": bool,
+        "filename": str,
+        "report": {
+            "data": {
+                "attributes": {
+                    "stats": {"malicious": int, "suspicious": int, "undetected": int, ...},
+                    "results": {"<EngineName>": {"category": str, "result": str, ...}, ...}
+                }
+            }
+        }
+    },
+    "decompile": {  # response from /decompile
+        "success": bool,
+        "filename": str,
+        "decompiled": str,   # Ghidra C pseudo-code for all functions
+        "objdump": str       # raw objdump -d output
+    }
+}
+```
+
+**Output contract (after adapter):** `{ "analyzer": "malware", "pass": N, "input": str, "findings": [...], "risk_score": 0.0–10.0, "raw_output": str }`
+
+**Full integration details:** See [docs/Malware-Analyzer-Orchestration.md](docs/Malware-Analyzer-Orchestration.md)
 
 ---
 
