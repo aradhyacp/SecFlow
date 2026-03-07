@@ -137,11 +137,69 @@ def adapt(raw: dict, pass_number: int, file_path: str) -> dict[str, Any]:
         })
         raw_parts.append(f"XLM macros: {xlm_macros[:200]}")
 
+    # ── Finding 6: VirusTotal threat intel (present when VIRUSTOTAL_API_KEY set) ──
+    vt = raw.get("vt")
+    if vt:
+        if not vt.get("success"):
+            vt_error = vt.get("error", "VT scan failed")
+            findings.append({
+                "type":     "error",
+                "detail":   f"VirusTotal: {vt_error}",
+                "severity": "low",
+                "evidence": "",
+            })
+            raw_parts.append(f"VT error: {vt_error}")
+        else:
+            stats       = vt.get("stats", {})
+            results_map = vt.get("results", {})
+            malicious   = stats.get("malicious", 0)
+            suspicious  = stats.get("suspicious", 0)
+            total       = sum(stats.values()) if stats else 0
+            raw_parts.append(
+                f"VT: malicious={malicious}, suspicious={suspicious}, total={total}"
+            )
+            if malicious > 0 or suspicious > 0:
+                sev = "critical" if malicious >= 5 else "high" if malicious > 0 else "medium"
+                findings.append({
+                    "type":     "malware_detection",
+                    "detail":   (
+                        f"VirusTotal: {malicious} malicious, {suspicious} suspicious "
+                        f"out of {total} engines"
+                    ),
+                    "severity": sev,
+                    "evidence": json.dumps(stats),
+                })
+                for engine, res in list(results_map.items())[:10]:
+                    if res.get("category") in ("malicious", "suspicious"):
+                        findings.append({
+                            "type":     "av_detection",
+                            "detail":   f"{engine}: {res.get('result', 'detected')}",
+                            "severity": "high" if res.get("category") == "malicious" else "medium",
+                            "evidence": json.dumps(res),
+                        })
+                        raw_parts.append(f"  [{engine}] {res.get('result', '')}")
+            else:
+                findings.append({
+                    "type":     "malware_detection",
+                    "detail":   f"VirusTotal: no detections ({total} engines clean)",
+                    "severity": "info",
+                    "evidence": json.dumps(stats),
+                })
+
+    # ── Risk score: base from oletools, raised if VT confirms malicious ────────
+    base_score = _RISK_SCORE.get(risk_level, 0.0)
+    if vt and vt.get("success"):
+        malicious = vt.get("stats", {}).get("malicious", 0)
+        if malicious >= 5:
+            base_score = max(base_score, 9.5)
+        elif malicious > 0:
+            base_score = max(base_score, 7.0)
+
     return {
         "analyzer":   "macro",
         "pass":       pass_number,
         "input":      file_path,
         "findings":   findings,
-        "risk_score": _RISK_SCORE.get(risk_level, 0.0),
+        "risk_score": base_score,
         "raw_output": "\n".join(raw_parts),
     }
