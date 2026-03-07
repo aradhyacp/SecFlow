@@ -536,7 +536,7 @@ Add the following service block to `backend/compose.yml`:
     restart: unless-stopped
 ```
 
-> **Key difference from the service's own `docker-compose.yml`:** The original uses `intelx-network` — change this to `secflow-net` to join the shared SecFlow Docker network so the Orchestrator can reach it by service name.
+> **Key difference from the service's own `docker-compose.yml`:** The original service-level network name differs from the shared platform network. Use `secflow-net` so the Orchestrator can reach Recon Analyzer by service name.
 
 ### Update `RECON_ANALYZER_URL` in the orchestrator service:
 

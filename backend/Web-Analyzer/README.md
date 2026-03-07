@@ -41,7 +41,7 @@ Web-Analyzer provides multiple endpoints to analyze websites:
 
 1. Clone the repository
 ```bash
-cd /home/sunaykulkarni/IntelX/backend/Web-Analyzer
+cd /home/sunaykulkarni/SecFlow/backend/Web-Analyzer
 ```
 
 2. Install dependencies

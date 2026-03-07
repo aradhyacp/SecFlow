@@ -12,7 +12,7 @@ Get up and running with Web-Analyzer in minutes!
 
 1. **Navigate to the Web-Analyzer directory**
 ```bash
-cd /home/sunaykulkarni/IntelX/backend/Web-Analyzer
+cd /home/sunaykulkarni/SecFlow/backend/Web-Analyzer
 ```
 
 2. **Create a virtual environment** (recommended)

@@ -164,6 +164,8 @@ secflow/
 
 ## Documentation
 
+> Backend documentation is the source of truth for service APIs and developer workflows.
+
 | Document | Description |
 |---|---|
 | [ProjectDetails.md](ProjectDetails.md) | Full project specification and design |
@@ -173,6 +175,12 @@ secflow/
 | [docs/analyzers.md](docs/analyzers.md) | Per-analyzer capability and interface spec |
 | [docs/migration.md](docs/migration.md) | Integration guide for the analyzer microservices |
 | [backend/Readme.md](backend/Readme.md) | Backend setup and development guide |
+| [backend/Recon-Analyzer/README.md](backend/Recon-Analyzer/README.md) | Recon Analyzer service documentation |
+| [backend/Malware-Analyzer/README.md](backend/Malware-Analyzer/README.md) | Malware Analyzer service documentation |
+| [backend/Web-Analyzer/README.md](backend/Web-Analyzer/README.md) | Web Analyzer service overview |
+| [backend/Web-Analyzer/QUICKSTART.md](backend/Web-Analyzer/QUICKSTART.md) | Web Analyzer quick start |
+| [backend/Web-Analyzer/API_DOCUMENTATION.md](backend/Web-Analyzer/API_DOCUMENTATION.md) | Web Analyzer API reference |
+| [backend/Web-Analyzer/DEVELOPMENT.md](backend/Web-Analyzer/DEVELOPMENT.md) | Web Analyzer development notes |
 | [frontend/Readme.md](frontend/Readme.md) | Frontend setup and development guide |
 
 ---
