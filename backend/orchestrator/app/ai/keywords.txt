@@ -1,0 +1,144 @@
+# SecFlow — keyword list for AI fallback grep
+# Lines beginning with # are comments and are ignored.
+# These keywords are matched (case-insensitive) against raw analyzer output
+# to extract the most relevant lines when output is too large to pass to Gemini.
+
+# Network indicators — URLs, protocols
+http://
+https://
+ftp://
+ws://
+wss://
+192.168.
+10.0.
+172.16.
+.onion
+
+# Domain / hostname patterns
+www.
+.com
+.net
+.org
+.io
+.in
+.co
+api.
+cdn.
+login.
+
+# Ghidra / binary string patterns
+STRING
+__libc
+connect(
+socket(
+gethostbyname
+getaddrinfo
+curl_easy
+HttpSend
+InternetOpen
+WinHttpOpen
+send(
+recv(
+bind(
+listen(
+accept(
+
+# TLS / SSL / crypto
+ssl
+tls
+certificate
+cipher
+encrypt
+decrypt
+openssl
+
+# File indicators
+.exe
+.dll
+.elf
+.so
+.bin
+.out
+.msi
+.bat
+.ps1
+.vbs
+.jar
+
+# Malware-specific
+payload
+malware
+trojan
+ransomware
+backdoor
+rootkit
+c2
+c&c
+beacon
+command and control
+dropper
+downloader
+injector
+shellcode
+reverse shell
+keylogger
+botnet
+exfil
+
+# Steg indicators
+embedded
+hidden
+lsb
+steghide
+zsteg
+steganograph
+extracted
+lsb
+metadata
+exiftool
+binwalk
+zsteg
+
+# Recon / network
+open port
+open_port
+blacklisted
+threatfox
+talos
+tor exit
+CVE-
+vulnerability
+exposed
+breach
+malicious
+phishing
+ioc
+indicator
+
+# Web vulnerabilities
+injection
+xss
+sqli
+csrf
+ssrf
+rce
+lfi
+rfi
+path traversal
+directory traversal
+misconfiguration
+missing header
+tls
+ssl
+certificate
+
+# Risk signals
+critical
+high severity
+malicious detection
+suspicious
+anomaly
+risk
+threat
+attack
+exploit

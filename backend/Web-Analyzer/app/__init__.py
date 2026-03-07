@@ -107,6 +107,12 @@ def index():
     })
 
 
+@app.route('/api/web-analyzer/health', methods=['GET'])
+def health():
+    """Health check endpoint for Docker and orchestrator liveness probes."""
+    return jsonify({'status': 'healthy', 'service': 'web-analyzer'})
+
+
 # Register blueprints from routes
 from app.routes import api_routes
 

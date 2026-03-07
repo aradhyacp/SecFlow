@@ -62,5 +62,4 @@ docker-compose.override.yml
 **/output/
 **/test_output.txt
 **/temp/
-
 reports/

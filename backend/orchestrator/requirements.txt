@@ -1,0 +1,9 @@
+flask>=3.0.0
+flask-cors>=4.0.0
+python-magic>=0.4.27
+requests>=2.31.0
+openai>=1.30.0
+jinja2>=3.1.2
+python-dotenv>=1.0.0
+gunicorn>=21.2.0
+jsonschema>=4.21.0
