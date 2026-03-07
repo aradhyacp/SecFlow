@@ -59,8 +59,8 @@ def _adapt_status(data: dict) -> list[dict]:
 
 def _adapt_security_headers(data: dict) -> tuple[list[dict], str]:
     findings = []
-    missing = data.get("missing", [])
-    present = data.get("present", [])
+    missing = list(data.get("missing", []))
+    present = list(data.get("present", []))
     score = data.get("score", "?")
     raw = f"security-headers: score={score}, missing={missing}"
 
