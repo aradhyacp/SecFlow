@@ -3,7 +3,7 @@ FROM python:3.11-slim
 # libmagic1: needed by python-magic
 # file: needed for fallback mime detection
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends libmagic1 file \
+    && apt-get install -y --no-install-recommends libmagic1 file curl \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
