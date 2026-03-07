@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  web-analyzer:
+    build: .
+    ports:
+      - "5001:5000"
+    environment:
+      FLASK_ENV: development
+      PORT: 5000
+      API_TIMEOUT_LIMIT: 20000
+      API_CORS_ORIGIN: "*"
+      API_ENABLE_RATE_LIMIT: "false"
+    volumes:
+      - .:/app
+    command: python run.py
