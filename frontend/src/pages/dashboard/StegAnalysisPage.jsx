@@ -2,8 +2,7 @@ import { useState, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Upload, FileImage, ShieldAlert, ImageIcon, Terminal, Activity, Eye, Download, AlertTriangle, CheckCircle, XCircle, ChevronDown, ChevronUp, Lock, Loader2 } from 'lucide-react'
 import { Button } from '../../components/ui/Button'
-
-const API_BASE = 'http://localhost:5002/api/steg-analyzer'
+import { API_ENDPOINTS } from '../../config/api'
 
 const TerminalLine = ({ text, delay = 0, color = 'text-foreground/70' }) => (
     <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay, duration: 0.3 }} className={`font-mono text-[10px] ${color}`}>
@@ -27,8 +26,8 @@ const ToolResultCard = ({ toolName, result }) => {
                             <div className="text-[10px] text-foreground/40 mb-1.5 font-mono uppercase">{category}</div>
                             <div className="grid grid-cols-4 gap-2">
                                 {urls.slice(0, 8).map((url, i) => (
-                                    <a key={i} href={`${API_BASE}${url}`} target="_blank" rel="noopener noreferrer" className="aspect-square bg-black/30 rounded border border-white/[0.06] overflow-hidden hover:border-purple-500/30 transition-colors">
-                                        <img src={`${API_BASE}${url}`} alt={`${category} ${i}`} className="w-full h-full object-cover" onError={(e) => { e.target.style.display = 'none' }} />
+                                    <a key={i} href={API_ENDPOINTS.steg.image(url)} target="_blank" rel="noopener noreferrer" className="aspect-square bg-black/30 rounded border border-white/[0.06] overflow-hidden hover:border-purple-500/30 transition-colors">
+                                        <img src={API_ENDPOINTS.steg.image(url)} alt={`${category} ${i}`} className="w-full h-full object-cover" onError={(e) => { e.target.style.display = 'none' }} />
                                     </a>
                                 ))}
                             </div>
@@ -65,7 +64,7 @@ const ToolResultCard = ({ toolName, result }) => {
                 </div>
                 <div className="flex items-center gap-2">
                     {result.download && (
-                        <a href={`${API_BASE}${result.download}`} onClick={(e) => e.stopPropagation()} className="text-[10px] text-purple-400 hover:underline flex items-center gap-1 font-mono">
+                        <a href={API_ENDPOINTS.steg.image(result.download)} onClick={(e) => e.stopPropagation()} className="text-[10px] text-purple-400 hover:underline flex items-center gap-1 font-mono">
                             <Download size={10} /> Download
                         </a>
                     )}
@@ -127,7 +126,7 @@ export default function StegAnalysisPage() {
         const maxAttempts = 120; let attempts = 0
         while (attempts < maxAttempts) {
             try {
-                const res = await fetch(`${API_BASE}/status/${hash}`)
+                const res = await fetch(API_ENDPOINTS.steg.status(hash))
                 if (!res.ok) throw new Error(`Status check failed: ${res.statusText}`)
                 const data = await res.json()
                 if (data.status === 'completed') return true
@@ -146,14 +145,14 @@ export default function StegAnalysisPage() {
             addLog(`[+] Initializing steganography analysis...`); addLog(`[+] Uploading ${file.name}...`)
             const formData = new FormData(); formData.append('image', file.rawFile)
             if (password) formData.append('password', password)
-            const uploadRes = await fetch(`${API_BASE}/upload`, { method: 'POST', body: formData })
+            const uploadRes = await fetch(API_ENDPOINTS.steg.upload, { method: 'POST', body: formData })
             if (!uploadRes.ok) throw new Error(`Upload failed: ${uploadRes.statusText}`)
             const uploadData = await uploadRes.json(); const hash = uploadData.submission_hash; setSubmissionHash(hash)
             addLog(`[+] File uploaded successfully`, 'text-emerald-400'); addLog(`[*] Submission hash: ${hash.substring(0, 16)}...`)
             setStatus('polling'); addLog(`[*] Starting analysis pipeline...`); addLog(`[*] Running: binwalk, strings, exiftool, steghide, zsteg...`)
             await pollStatus(hash); addLog(`[+] Analysis complete!`, 'text-emerald-400')
             addLog(`[*] Fetching results...`)
-            const resultRes = await fetch(`${API_BASE}/result/${hash}`)
+            const resultRes = await fetch(API_ENDPOINTS.steg.result(hash))
             if (!resultRes.ok) throw new Error(`Failed to fetch results: ${resultRes.statusText}`)
             const resultData = await resultRes.json(); setResults(resultData.results); setStatus('completed'); addLog(`[+] Results loaded successfully`, 'text-emerald-400')
         } catch (err) { addLog(`[!] Error: ${err.message}`, 'text-red-500'); setError(err.message); setStatus('error') } finally { setAnalyzing(false) }

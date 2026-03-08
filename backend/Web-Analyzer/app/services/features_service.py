@@ -21,10 +21,19 @@ def get_features(url: str) -> Dict[str, Any]:
     api_key = os.getenv('BUILT_WITH_API_KEY')
     
     if not url:
-        raise Exception('URL query parameter is required')
+        return {
+            "status": "error",
+            "scanUrl": url,
+            "error": "URL query parameter is required",
+        }
     
     if not api_key:
-        raise Exception('Missing BuiltWith API key in environment variables')
+        return {
+            "status": "unavailable",
+            "scanUrl": url,
+            "provider": "builtwith",
+            "reason": "Missing BUILT_WITH_API_KEY in environment variables",
+        }
     
     try:
         api_url = f"https://api.builtwith.com/free1/api.json?KEY={api_key}&LOOKUP={quote(url)}"
@@ -35,4 +44,9 @@ def get_features(url: str) -> Dict[str, Any]:
         return response.json()
         
     except Exception as e:
-        raise Exception(f"Error making request: {str(e)}")
+        return {
+            "status": "unavailable",
+            "scanUrl": url,
+            "provider": "builtwith",
+            "reason": f"BuiltWith request failed: {str(e)}",
+        }

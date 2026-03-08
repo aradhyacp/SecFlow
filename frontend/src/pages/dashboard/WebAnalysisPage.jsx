@@ -2,36 +2,35 @@ import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Search, Globe, Shield, ShieldAlert, Activity, List, Server, TriangleAlert, CheckCircle, Clock, MapPin, Lock, FileText, Share2, Info, ChevronDown, ChevronUp, AlertCircle, Wifi, Mail, Link2, Cookie, ExternalLink, Crosshair } from 'lucide-react'
 import { Button } from '../../components/ui/Button'
-
-const API_BASE = 'http://localhost:5001/api/web-analyzer'
+import { API_ENDPOINTS as SERVICE_ENDPOINTS, WEB_ANALYZER_PATHS } from '../../config/api'
 
 const API_ENDPOINTS = [
-    { key: 'status', endpoint: '/status', name: 'Status Check' },
-    { key: 'dns', endpoint: '/dns', name: 'DNS Records' },
-    { key: 'headers', endpoint: '/headers', name: 'HTTP Headers' },
-    { key: 'securityHeaders', endpoint: '/security-headers', name: 'Security Headers' },
-    { key: 'securityTxt', endpoint: '/security-txt', name: 'Security.txt' },
-    { key: 'techStack', endpoint: '/tech-stack', name: 'Tech Stack' },
-    { key: 'whois', endpoint: '/whois', name: 'WHOIS' },
-    { key: 'robotsTxt', endpoint: '/robots-txt', name: 'Robots.txt' },
-    { key: 'sitemap', endpoint: '/sitemap', name: 'Sitemap' },
-    { key: 'cookies', endpoint: '/cookies', name: 'Cookies' },
-    { key: 'hsts', endpoint: '/hsts', name: 'HSTS' },
-    { key: 'redirects', endpoint: '/redirects', name: 'Redirects' },
-    { key: 'ports', endpoint: '/ports', name: 'Port Scan' },
-    { key: 'getIp', endpoint: '/get-ip', name: 'IP Lookup' },
-    { key: 'socialTags', endpoint: '/social-tags', name: 'Social Tags' },
-    { key: 'txtRecords', endpoint: '/txt-records', name: 'TXT Records' },
-    { key: 'linkedPages', endpoint: '/linked-pages', name: 'Linked Pages' },
-    { key: 'mailConfig', endpoint: '/mail-config', name: 'Mail Config' },
-    { key: 'dnssec', endpoint: '/dnssec', name: 'DNSSEC' },
-    { key: 'firewall', endpoint: '/firewall', name: 'Firewall' },
-    { key: 'dnsServer', endpoint: '/dns-server', name: 'DNS Server' },
-    { key: 'traceRoute', endpoint: '/trace-route', name: 'Trace Route' },
-    { key: 'tls', endpoint: '/tls', name: 'TLS Configuration' },
-    { key: 'rank', endpoint: '/rank', name: 'Domain Rank' },
-    { key: 'carbon', endpoint: '/carbon', name: 'Carbon' },
-    { key: 'blockLists', endpoint: '/block-lists', name: 'Block Lists' },
+    { key: 'status', endpoint: WEB_ANALYZER_PATHS.status, name: 'Status Check' },
+    { key: 'dns', endpoint: WEB_ANALYZER_PATHS.dns, name: 'DNS Records' },
+    { key: 'headers', endpoint: WEB_ANALYZER_PATHS.headers, name: 'HTTP Headers' },
+    { key: 'securityHeaders', endpoint: WEB_ANALYZER_PATHS.securityHeaders, name: 'Security Headers' },
+    { key: 'securityTxt', endpoint: WEB_ANALYZER_PATHS.securityTxt, name: 'Security.txt' },
+    { key: 'techStack', endpoint: WEB_ANALYZER_PATHS.techStack, name: 'Tech Stack' },
+    { key: 'whois', endpoint: WEB_ANALYZER_PATHS.whois, name: 'WHOIS' },
+    { key: 'robotsTxt', endpoint: WEB_ANALYZER_PATHS.robotsTxt, name: 'Robots.txt' },
+    { key: 'sitemap', endpoint: WEB_ANALYZER_PATHS.sitemap, name: 'Sitemap' },
+    { key: 'cookies', endpoint: WEB_ANALYZER_PATHS.cookies, name: 'Cookies' },
+    { key: 'hsts', endpoint: WEB_ANALYZER_PATHS.hsts, name: 'HSTS' },
+    { key: 'redirects', endpoint: WEB_ANALYZER_PATHS.redirects, name: 'Redirects' },
+    { key: 'ports', endpoint: WEB_ANALYZER_PATHS.ports, name: 'Port Scan' },
+    { key: 'getIp', endpoint: WEB_ANALYZER_PATHS.getIp, name: 'IP Lookup' },
+    { key: 'socialTags', endpoint: WEB_ANALYZER_PATHS.socialTags, name: 'Social Tags' },
+    { key: 'txtRecords', endpoint: WEB_ANALYZER_PATHS.txtRecords, name: 'TXT Records' },
+    { key: 'linkedPages', endpoint: WEB_ANALYZER_PATHS.linkedPages, name: 'Linked Pages' },
+    { key: 'mailConfig', endpoint: WEB_ANALYZER_PATHS.mailConfig, name: 'Mail Config' },
+    { key: 'dnssec', endpoint: WEB_ANALYZER_PATHS.dnssec, name: 'DNSSEC' },
+    { key: 'firewall', endpoint: WEB_ANALYZER_PATHS.firewall, name: 'Firewall' },
+    { key: 'dnsServer', endpoint: WEB_ANALYZER_PATHS.dnsServer, name: 'DNS Server' },
+    { key: 'traceRoute', endpoint: WEB_ANALYZER_PATHS.traceRoute, name: 'Trace Route' },
+    { key: 'tls', endpoint: WEB_ANALYZER_PATHS.tls, name: 'TLS Configuration' },
+    { key: 'rank', endpoint: WEB_ANALYZER_PATHS.rank, name: 'Domain Rank' },
+    { key: 'carbon', endpoint: WEB_ANALYZER_PATHS.carbon, name: 'Carbon' },
+    { key: 'blockLists', endpoint: WEB_ANALYZER_PATHS.blockLists, name: 'Block Lists' },
 ]
 
 // ─── SOC Panel Card ───
@@ -88,15 +87,16 @@ export default function WebAnalysisPage() {
 
     const handleScan = async () => {
         if (!url.trim()) return
+        const startedAt = Date.now()
         setLoading(true)
         setResults({})
         setProgress({ completed: 0, total: API_ENDPOINTS.length, successful: 0, failed: 0 })
-        setStartTime(Date.now())
+        setStartTime(startedAt)
         setDuration(null)
         const cleanUrl = url.replace(/^https?:\/\//, '').replace(/\/$/, '')
         const promises = API_ENDPOINTS.map(async ({ key, endpoint, name }) => {
             try {
-                const res = await fetch(`${API_BASE}${endpoint}?url=${encodeURIComponent(cleanUrl)}`)
+                const res = await fetch(`${SERVICE_ENDPOINTS.web.route(endpoint)}?url=${encodeURIComponent(cleanUrl)}`)
                 if (!res.ok) throw new Error(`HTTP ${res.status}`)
                 const data = await res.json()
                 setResults(prev => ({ ...prev, [key]: { data, status: 'success' } }))
@@ -110,7 +110,7 @@ export default function WebAnalysisPage() {
         })
         await Promise.allSettled(promises)
         setLoading(false)
-        setDuration(((Date.now() - Date.now()) / 1000).toFixed(2))
+        setDuration(((Date.now() - startedAt) / 1000).toFixed(2))
     }
 
     const hasResults = Object.keys(results).length > 0

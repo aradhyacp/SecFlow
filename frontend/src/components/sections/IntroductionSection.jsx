@@ -1,6 +1,6 @@
 import { motion, useInView } from 'framer-motion'
 import { useRef } from 'react'
-import { Target, Shield, Network, AlertTriangle, Code, Server, Search, Lock, Users, ChevronRight } from 'lucide-react'
+import { Target, Shield, Network, AlertTriangle, Code, Server, Search, Lock, Users, ChevronRight, FileCode } from 'lucide-react'
 
 export function IntroductionSection() {
     const ref = useRef(null)
@@ -28,6 +28,7 @@ export function IntroductionSection() {
     const identifyItems = [
         { icon: Target, text: 'Web attack surface and misconfigurations' },
         { icon: Shield, text: 'Malware indicators and suspicious binaries' },
+        { icon: FileCode, text: 'Malicious Office macros and script payloads' },
         { icon: Network, text: 'Infrastructure exposure and DNS relationships' },
         { icon: AlertTriangle, text: 'Hidden payloads and OSINT risk signals' },
     ]

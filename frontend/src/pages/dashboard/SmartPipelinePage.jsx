@@ -7,6 +7,7 @@ import {
     Shield, AlertTriangle, Hash, ChevronRight, Crosshair, Server
 } from 'lucide-react'
 import { Button } from '../../components/ui/Button'
+import { API_ENDPOINTS, resolveReportUrl } from '../../config/api'
 
 const TerminalLine = ({ text, delay = 0, color = 'text-foreground/70' }) => (
     <motion.div
@@ -41,9 +42,37 @@ const StatusBadge = ({ status }) => {
 const ANALYZERS = [
     { key: 'web', label: 'Web Analysis', icon: Globe, desc: 'DNS, SSL, headers, tech stack', accepts: ['url'] },
     { key: 'malware', label: 'Malware Analysis', icon: Bug, desc: 'Static & dynamic binary inspection', accepts: ['exe', 'dll', 'so', 'elf', 'bin', 'o', 'out'] },
+    { key: 'macro', label: 'Macro Analysis', icon: FileCode, desc: 'Office macro extraction and IOC triage', accepts: ['doc', 'docx', 'docm', 'xls', 'xlsx', 'xlsm', 'xlsb', 'ppt', 'pptx', 'pptm', 'rtf'] },
     { key: 'steg', label: 'Steg Analysis', icon: Eye, desc: 'Hidden data detection in media', accepts: ['png', 'jpg', 'jpeg', 'bmp', 'gif', 'wav', 'mp3'] },
     { key: 'recon', label: 'Recon Analysis', icon: Radar, desc: 'OSINT & digital footprint', accepts: ['ip', 'domain', 'email', 'phone'] },
 ]
+
+const ORCHESTRATOR_MAX_PASSES = 3
+
+const buildPipelineSteps = (analyzerKeys = [], analyzerStatus = 'pending') => {
+    const analyzerSteps = analyzerKeys
+        .map((key) => ANALYZERS.find((analyzer) => analyzer.key === key))
+        .filter(Boolean)
+        .map((analyzer) => ({ ...analyzer, status: analyzerStatus }))
+
+    return [
+        { key: 'input', label: 'Input Processing', icon: Layers, desc: 'Parsing & classifying inputs', status: 'pending' },
+        { key: 'routing', label: 'Smart Routing', icon: GitBranch, desc: 'Selecting appropriate analyzers', status: 'pending' },
+        ...analyzerSteps,
+        { key: 'report', label: 'Unified Report', icon: FileOutput, desc: 'Consolidating all findings', status: 'pending' },
+    ]
+}
+
+const normalizeAnalyzerKey = (value) => {
+    const key = String(value || '').trim().toLowerCase()
+    if (!key) return null
+
+    if (key === 'url') return 'web'
+    if (key === 'steganography') return 'steg'
+    if (key === 'reconnaissance') return 'recon'
+
+    return ANALYZERS.some((analyzer) => analyzer.key === key) ? key : null
+}
 
 export default function SmartPipelinePage() {
     const [files, setFiles] = useState([])
@@ -182,67 +211,113 @@ export default function SmartPipelinePage() {
         setResults(null)
 
         const detectedKeys = detectAnalyzers()
-        const steps = detectedKeys.map(key => {
-            const analyzer = ANALYZERS.find(a => a.key === key)
-            return { ...analyzer, status: 'pending' }
-        })
+        const fallbackKeys = detectedKeys.length > 0 ? detectedKeys : ['malware']
 
-        const fullPipeline = [
-            { key: 'input', label: 'Input Processing', icon: Layers, desc: 'Parsing & classifying inputs', status: 'pending' },
-            { key: 'routing', label: 'Smart Routing', icon: GitBranch, desc: 'Selecting appropriate analyzers', status: 'pending' },
-            ...steps,
-            { key: 'report', label: 'Unified Report', icon: FileOutput, desc: 'Consolidating all findings', status: 'pending' },
-        ]
-
-        setPipelineSteps(fullPipeline)
+        setPipelineSteps(buildPipelineSteps(fallbackKeys, 'pending'))
 
         addLog('[+] Smart Pipeline initialized...', 'text-emerald-400')
         addLog(`[+] Processing ${files.length === 1 ? '1 file' : `${files.length} files`} and ${textInput ? '1 text input' : '0 text inputs'}...`)
 
-        await delay(800)
+        await delay(300)
         updateStep('input', 'running')
         addLog('[*] Classifying input types...')
-        await delay(1200)
+        await delay(450)
         files.forEach(f => addLog(`    ├─ ${f.name} → ${f.type.toUpperCase()}`, 'text-foreground/50'))
         if (textInput) addLog(`    └─ Text: "${textInput.substring(0, 40)}..."`, 'text-foreground/50')
         updateStep('input', 'complete')
 
-        await delay(600)
+        await delay(220)
         updateStep('routing', 'running')
         addLog('[*] Routing to analyzers...')
-        await delay(1000)
-        detectedKeys.forEach(key => {
+        await delay(350)
+        fallbackKeys.forEach(key => {
             const a = ANALYZERS.find(x => x.key === key)
             addLog(`    ├─ ${a.label} selected`, 'text-amber-400')
         })
         updateStep('routing', 'complete')
 
-        for (const key of detectedKeys) {
-            await delay(500)
-            updateStep(key, 'running')
-            const analyzer = ANALYZERS.find(a => a.key === key)
-            addLog(`[+] Starting ${analyzer.label}...`, 'text-emerald-400')
-            await delay(1500 + Math.random() * 1500)
-            addLog(`[✓] ${analyzer.label} complete — findings collected`, 'text-emerald-400')
-            updateStep(key, 'complete')
-        }
-
-        await delay(500)
+        fallbackKeys.forEach((key) => updateStep(key, 'running'))
         updateStep('report', 'running')
-        addLog('[*] Generating unified report...')
-        await delay(1500)
-        updateStep('report', 'complete')
-        addLog('[✓] Smart Pipeline run complete! All pipelines finished.', 'text-emerald-400')
+        addLog(`[+] Dispatching request to orchestrator (passes=${ORCHESTRATOR_MAX_PASSES})...`, 'text-cyan-300')
 
-        setResults({
-            analyzersRun: detectedKeys.length,
-            filesProcessed: files.length + (textInput ? 1 : 0),
-            findings: Math.floor(Math.random() * 12) + 3,
-            riskScore: Math.floor(Math.random() * 100),
-            timestamp: new Date().toLocaleString(),
-        })
+        try {
+            const requestUrl = `${API_ENDPOINTS.orchestrator.smartAnalyze}?passes=${ORCHESTRATOR_MAX_PASSES}`
+            let response
 
-        setRunning(false)
+            if (files.length > 0) {
+                const formData = new FormData()
+                formData.append('file', files[0].rawFile)
+                response = await fetch(requestUrl, { method: 'POST', body: formData })
+            } else {
+                response = await fetch(requestUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ target: textInput.trim() }),
+                })
+            }
+
+            const payload = await response.json().catch(() => null)
+            if (!response.ok) {
+                throw new Error(payload?.error || `Orchestrator API error (${response.status})`)
+            }
+
+            const findingsSummary = Array.isArray(payload?.findings_summary) ? payload.findings_summary : []
+            const orderedAnalyzerKeys = findingsSummary
+                .map((entry) => normalizeAnalyzerKey(entry?.analyzer))
+                .filter(Boolean)
+
+            const uniqueAnalyzerKeys = []
+            orderedAnalyzerKeys.forEach((key) => {
+                if (!uniqueAnalyzerKeys.includes(key)) uniqueAnalyzerKeys.push(key)
+            })
+
+            const analyzerKeysForUi = uniqueAnalyzerKeys.length > 0 ? uniqueAnalyzerKeys : fallbackKeys
+            const completedPipeline = buildPipelineSteps(analyzerKeysForUi, 'complete')
+            setPipelineSteps(completedPipeline)
+
+            if (payload?.job_id) {
+                addLog(`[+] Job ID: ${payload.job_id}`, 'text-cyan-300')
+            }
+
+            findingsSummary.forEach((entry, index) => {
+                const analyzerKey = normalizeAnalyzerKey(entry?.analyzer)
+                const analyzerName = ANALYZERS.find((item) => item.key === analyzerKey)?.label || entry?.analyzer || 'Analyzer'
+                const findingCount = Array.isArray(entry?.findings) ? entry.findings.length : 0
+                const risk = typeof entry?.risk_score === 'number' ? entry.risk_score.toFixed(2) : '0.00'
+                addLog(`[✓] Pass ${entry?.pass || index + 1}: ${analyzerName} completed (${findingCount} findings, risk ${risk})`, 'text-emerald-400')
+            })
+
+            const orchestratorRisk = Number(payload?.overall_risk_score || 0)
+            const boundedRisk = Number.isFinite(orchestratorRisk) ? Math.min(10, Math.max(0, orchestratorRisk)) : 0
+            const totalFindings = findingsSummary.reduce((acc, entry) => {
+                const count = Array.isArray(entry?.findings) ? entry.findings.length : 0
+                return acc + count
+            }, 0)
+
+            setResults({
+                analyzersRun: analyzerKeysForUi.length,
+                filesProcessed: files.length > 0 || textInput.trim() ? 1 : 0,
+                findings: totalFindings,
+                riskScore: Math.round(boundedRisk * 10),
+                orchestratorRisk: boundedRisk,
+                timestamp: new Date().toLocaleString(),
+                reportUrls: {
+                    json: resolveReportUrl(payload?.report_urls?.json),
+                    html: resolveReportUrl(payload?.report_urls?.html),
+                },
+            })
+
+            addLog('[✓] Smart Pipeline run complete! All analyzers finished.', 'text-emerald-400')
+        } catch (error) {
+            setPipelineSteps((prev) => prev.map((step) => {
+                if (step.key === 'report') return { ...step, status: 'error' }
+                if (step.status === 'running') return { ...step, status: 'error' }
+                return step
+            }))
+            addLog(`[!] Pipeline failed: ${error.message}`, 'text-red-500')
+        } finally {
+            setRunning(false)
+        }
     }
 
     const updateStep = (key, status) => {
@@ -617,8 +692,30 @@ export default function SmartPipelinePage() {
                                                 <div className="text-[10px] text-foreground/30 font-mono">{results.timestamp}</div>
                                             </div>
                                         </div>
-                                        <div className={`px-3 py-1.5 rounded text-[10px] font-mono font-bold tracking-wider border ${getThreatBg(results.riskScore)} ${getThreatColor(results.riskScore)}`}>
-                                            THREAT: {getThreatLevel(results.riskScore)}
+                                        <div className="flex items-center gap-2">
+                                            {results.reportUrls?.html && (
+                                                <a
+                                                    href={results.reportUrls.html}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="px-3 py-1.5 rounded text-[10px] font-mono font-bold tracking-wider border border-cyan-400/25 text-cyan-300 bg-cyan-500/10 hover:border-cyan-300/40 transition-colors"
+                                                >
+                                                    OPEN HTML
+                                                </a>
+                                            )}
+                                            {results.reportUrls?.json && (
+                                                <a
+                                                    href={results.reportUrls.json}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="px-3 py-1.5 rounded text-[10px] font-mono font-bold tracking-wider border border-indigo-400/25 text-indigo-300 bg-indigo-500/10 hover:border-indigo-300/40 transition-colors"
+                                                >
+                                                    DOWNLOAD JSON
+                                                </a>
+                                            )}
+                                            <div className={`px-3 py-1.5 rounded text-[10px] font-mono font-bold tracking-wider border ${getThreatBg(results.riskScore)} ${getThreatColor(results.riskScore)}`}>
+                                                THREAT: {getThreatLevel(results.riskScore)}
+                                            </div>
                                         </div>
                                     </div>
 
@@ -649,6 +746,9 @@ export default function SmartPipelinePage() {
                                                 </div>
                                                 <div className="text-[10px] text-foreground/30 font-mono mt-1">
                                                     Based on {results.analyzersRun} analyzer(s) scanning {results.filesProcessed} input(s)
+                                                </div>
+                                                <div className="text-[10px] text-foreground/30 font-mono mt-1">
+                                                    Orchestrator risk score: {Number(results.orchestratorRisk || 0).toFixed(2)} / 10
                                                 </div>
                                             </div>
                                         </div>
