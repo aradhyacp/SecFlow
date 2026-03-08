@@ -97,6 +97,13 @@ def get_archives(url: str) -> Dict[str, Any]:
     Returns:
         Dictionary containing archive statistics and scan data
     """
+    if not url:
+        return {
+            "status": "error",
+            "scanUrl": url,
+            "error": "URL query parameter is required",
+        }
+
     cdx_url = f"https://web.archive.org/cdx/search/cdx?url={url}&output=json&fl=timestamp,statuscode,digest,length,offset"
     
     try:
@@ -131,6 +138,14 @@ def get_archives(url: str) -> Dict[str, Any]:
         }
         
     except requests.RequestException as e:
-        raise Exception(f"Error fetching Wayback data: {str(e)}")
+        return {
+            "status": "unavailable",
+            "scanUrl": url,
+            "reason": f"Error fetching Wayback data: {str(e)}",
+        }
     except Exception as e:
-        raise Exception(f"Error processing Wayback data: {str(e)}")
+        return {
+            "status": "unavailable",
+            "scanUrl": url,
+            "reason": f"Error processing Wayback data: {str(e)}",
+        }

@@ -1,7 +1,7 @@
 import { motion } from 'framer-motion'
 import { Link } from 'react-router-dom'
 import { Button } from '../ui/Button'
-import { Zap, Shield, Search, Eye, FileCode, Workflow, Layers, GitBranch, FileOutput } from 'lucide-react'
+import { Zap, Shield, Search, Eye, Workflow, Layers, GitBranch, FileOutput, FileCode } from 'lucide-react'
 
 // Animated background component with particles and grid
 function AnimatedBackground() {

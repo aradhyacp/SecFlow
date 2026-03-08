@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion'
 import { Link } from 'react-router-dom'
-import { Globe, Bug, FileCode, Eye, Radar, ArrowRight, BookOpen } from 'lucide-react'
+import { Globe, Bug, Eye, Radar, FileCode, ArrowRight, BookOpen } from 'lucide-react'
 
 const tools = [
     {
@@ -24,11 +24,11 @@ const tools = [
     {
         icon: FileCode,
         title: 'Macro Analysis',
-        desc: 'Office document macro inspection with VBA extraction and IOC scoring.',
+        desc: 'Office macro extraction, suspicious VBA behavior checks, and IOC triage.',
         link: '/docs/macro-analysis',
-        glowClass: 'bg-amber-500/8',
-        iconClass: 'bg-amber-500/12 text-amber-300 border-amber-400/30',
-        linkClass: 'text-amber-300'
+        glowClass: 'bg-cyan-500/8',
+        iconClass: 'bg-cyan-500/12 text-cyan-300 border-cyan-400/30',
+        linkClass: 'text-cyan-300'
     },
     {
         icon: Eye,

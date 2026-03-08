@@ -7,8 +7,20 @@ export default defineConfig({
     port: 3000,
     open: true,
     proxy: {
+      '/api/smart-analyze': {
+        target: 'http://localhost:5000',
+        changeOrigin: true,
+      },
+      '/api/report': {
+        target: 'http://localhost:5000',
+        changeOrigin: true,
+      },
+      '/api/health': {
+        target: 'http://localhost:5000',
+        changeOrigin: true,
+      },
       '/api/web-analyzer': {
-        target: 'http://localhost:5001',
+        target: 'http://localhost:5005',
         changeOrigin: true,
       },
       '/api/steg-analyzer': {
@@ -21,7 +33,11 @@ export default defineConfig({
         rewrite: (path) => path.replace(/^\/api\/Recon-Analyzer/, '/api/Recon-Analyzer')
       },
       '/api/malware-analyzer': {
-        target: 'http://localhost:5000',
+        target: 'http://localhost:5001',
+        changeOrigin: true,
+      },
+      '/api/macro-analyzer': {
+        target: 'http://localhost:5006',
         changeOrigin: true,
       }
     }

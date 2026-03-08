@@ -25,7 +25,11 @@ def get_screenshot(url: str) -> Dict[str, Any]:
         Dictionary containing base64 encoded screenshot
     """
     if not url:
-        raise Exception('URL is missing from parameters')
+        return {
+            "status": "error",
+            "scanUrl": url,
+            "error": "URL is missing from parameters",
+        }
     
     # Ensure URL has protocol
     if not url.startswith('http://') and not url.startswith('https://'):
@@ -38,7 +42,11 @@ def get_screenshot(url: str) -> Dict[str, Any]:
         if not all([result.scheme, result.netloc]):
             raise ValueError
     except Exception:
-        raise Exception('URL provided is invalid')
+        return {
+            "status": "error",
+            "scanUrl": url,
+            "error": "URL provided is invalid",
+        }
     
     driver = None
     try:
@@ -91,7 +99,11 @@ def get_screenshot(url: str) -> Dict[str, Any]:
         return {"image": base64_screenshot}
         
     except Exception as e:
-        raise Exception(f"Screenshot failed: {str(e)}")
+        return {
+            "status": "unavailable",
+            "scanUrl": url,
+            "reason": f"Screenshot tooling unavailable: {str(e)}",
+        }
         
     finally:
         if driver:

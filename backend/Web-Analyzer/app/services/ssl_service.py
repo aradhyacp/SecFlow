@@ -28,7 +28,12 @@ def get_ssl_certificate(url):
     port = parsed_url.port or 443
     
     if not hostname:
-        raise ValueError('Unable to extract hostname from URL')
+        return {
+            "available": False,
+            "hostname": None,
+            "port": port,
+            "error": "Unable to extract hostname from URL",
+        }
     
     try:
         # Create SSL context
@@ -61,11 +66,26 @@ def get_ssl_certificate(url):
                 return cert_info
     
     except ssl.SSLError as e:
-        raise ValueError(f'SSL Error: {str(e)}')
+        return {
+            "available": False,
+            "hostname": hostname,
+            "port": port,
+            "error": f"SSL Error: {str(e)}",
+        }
     except socket.timeout:
-        raise ValueError('Connection timeout while fetching certificate')
+        return {
+            "available": False,
+            "hostname": hostname,
+            "port": port,
+            "error": "Connection timeout while fetching certificate",
+        }
     except Exception as e:
-        raise ValueError(f'Error fetching SSL certificate: {str(e)}')
+        return {
+            "available": False,
+            "hostname": hostname,
+            "port": port,
+            "error": f"Error fetching SSL certificate: {str(e)}",
+        }
 
 
 def format_cert_name(name_tuple):

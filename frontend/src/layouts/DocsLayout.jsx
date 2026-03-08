@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Outlet, NavLink, Link } from 'react-router-dom'
-import { Book, Globe, Bug, FileCode, Radar, Eye, ArrowLeft, Menu, ChevronRight } from 'lucide-react'
+import { Book, Globe, Bug, Radar, Eye, FileCode, ArrowLeft, Menu, ChevronRight } from 'lucide-react'
 
 const DocLink = ({ to, icon: Icon, label }) => (
     <NavLink

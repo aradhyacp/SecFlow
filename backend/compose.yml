@@ -105,6 +105,7 @@ services:
       - CLEAR_AT_RESTART=1
       - REMOVAL_MIN_AGE_SECONDS=300
       - FLASK_DEBUG=0
+      - REDIS_URL=redis://steg-redis:6379/0
       - RQ_DASHBOARD_REDIS_URL=redis://steg-redis:6379/0
       - POSTGRES_DB=secflow
       - POSTGRES_USER=secflowuser
@@ -122,6 +123,8 @@ services:
         condition: service_started
     networks:
       - secflow-net
+    volumes:
+      - steg-results:/app/secflow/results
     restart: unless-stopped
 
   steg-worker:
@@ -132,6 +135,7 @@ services:
     command: rq worker default --url redis://steg-redis:6379/0
     environment:
       - DB_URI=postgresql://secflowuser:${STEG_POSTGRES_PASSWORD:-secflowpass}@steg-postgres:5432/secflow
+      - REDIS_URL=redis://steg-redis:6379/0
       - RQ_DASHBOARD_REDIS_URL=redis://steg-redis:6379/0
       - PYTHONUNBUFFERED=1
     depends_on:
@@ -143,6 +147,8 @@ services:
         condition: service_started
     networks:
       - secflow-net
+    volumes:
+      - steg-results:/app/secflow/results
     restart: unless-stopped
 
   steg-initdb:
@@ -270,4 +276,6 @@ volumes:
   malware-uploads:
     driver: local
   steg-pgdata:
+    driver: local
+  steg-results:
     driver: local

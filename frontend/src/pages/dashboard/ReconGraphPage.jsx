@@ -6,8 +6,7 @@ import {
     Eye, EyeOff, Activity, Wifi, Lock, Unlock, ExternalLink, Crosshair
 } from 'lucide-react'
 import { Button } from '../../components/ui/Button'
-
-const API_BASE = 'http://localhost:5003/api/Recon-Analyzer'
+import { API_ENDPOINTS } from '../../config/api'
 
 const InfoRow = ({ label, value, icon: Icon, color = 'white' }) => (
     <div className="flex items-center justify-between py-1.5 border-b border-white/[0.03] last:border-0 text-xs">
@@ -72,13 +71,13 @@ export default function ReconGraphPage() {
     const [healthStatus, setHealthStatus] = useState(null)
 
     useEffect(() => {
-        fetch(`${API_BASE}/health`).then(res => res.json()).then(data => setHealthStatus(data.status)).catch(() => setHealthStatus('unhealthy'))
+        fetch(API_ENDPOINTS.recon.health).then(res => res.json()).then(data => setHealthStatus(data.status)).catch(() => setHealthStatus('unhealthy'))
     }, [])
 
     const handleThreatScan = async () => {
         if (!query.trim()) return; setLoading(true); setError(null); setResults(null)
         try {
-            const res = await fetch(`${API_BASE}/scan`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query: query.trim() }) })
+            const res = await fetch(API_ENDPOINTS.recon.scan, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query: query.trim() }) })
             if (!res.ok) throw new Error('Scan failed'); const data = await res.json(); setResults({ type: 'threat', data })
         } catch (e) { setError(e.message || 'Failed to perform threat scan') } finally { setLoading(false) }
     }
@@ -86,7 +85,7 @@ export default function ReconGraphPage() {
     const handleFootprintScan = async () => {
         if (!query.trim()) return; setLoading(true); setError(null); setResults(null)
         try {
-            const res = await fetch(`${API_BASE}/footprint`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query: query.trim(), type: footprintType }) })
+            const res = await fetch(API_ENDPOINTS.recon.footprint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query: query.trim(), type: footprintType }) })
             if (!res.ok) throw new Error('Footprint analysis failed'); const data = await res.json(); setResults({ type: 'footprint', subtype: footprintType, data })
         } catch (e) { setError(e.message || 'Failed to analyze footprint') } finally { setLoading(false) }
     }

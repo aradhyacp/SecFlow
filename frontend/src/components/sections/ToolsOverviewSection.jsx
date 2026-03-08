@@ -1,7 +1,7 @@
 import { motion, useInView } from 'framer-motion'
 import { useRef } from 'react'
 import { Link } from 'react-router-dom'
-import { Globe, Bug, FileCode, Eye, Radar, ArrowRight } from 'lucide-react'
+import { Globe, Bug, Eye, Radar, FileCode, ArrowRight } from 'lucide-react'
 
 const tools = [
     {
@@ -52,22 +52,22 @@ const tools = [
     {
         icon: FileCode,
         title: 'Macro Analysis',
-        subtitle: 'Document Macro Threat Triage',
+        subtitle: 'Office Macro Forensics',
         description:
-            'SecFlow Macro Analyzer triages Office documents for VBA/XLM macro behavior, suspicious execution paths, and extracted IOCs.',
-        highlight: 'Macro extraction, IOC flags, and risk scoring',
+            'SecFlow Macro Analyzer inspects Office documents for VBA macros, suspicious auto-execution logic, and IOC patterns.',
+        highlight: 'Macro extraction, IOC triage, and optional VirusTotal enrichment',
         features: [
-            'Macro extraction from DOC/XLS/PPT families',
-            'AutoExec and suspicious indicator detection',
-            'IOC extraction for URLs, domains, and artifacts',
-            'Risk classification: clean to malicious',
+            'VBA stream extraction with macro detectors',
+            'AutoExec and suspicious keyword scoring',
+            'URL, IP, and command IOC harvesting',
+            'Document risk-level classification',
         ],
         accent: {
-            text: 'text-blue-300',
-            badge: 'text-blue-300',
-            iconPanel: 'bg-blue-500/10 border-blue-500/30',
-            border: 'hover:border-blue-500/35',
-            topBar: 'via-blue-400',
+            text: 'text-cyan-300',
+            badge: 'text-cyan-300',
+            iconPanel: 'bg-cyan-500/10 border-cyan-500/30',
+            border: 'hover:border-cyan-500/35',
+            topBar: 'via-cyan-400',
         },
         link: '/docs/macro-analysis'
     },

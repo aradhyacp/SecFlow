@@ -16,12 +16,26 @@ def get_carbon_footprint(url: str) -> Dict[str, Any]:
     Returns:
         Dictionary containing carbon footprint statistics
     """
+    if not url:
+        return {
+            "status": "error",
+            "scanUrl": url,
+            "error": "URL query parameter is required",
+        }
+
     try:
-        # First, get the size of the website's HTML
-        response = requests.get(url, timeout=10, headers={
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-        })
-        response.raise_for_status()
+        # First, get the size of the website's HTML. Retry without cert verification
+        # when upstream TLS chain validation fails in containerized environments.
+        try:
+            response = requests.get(url, timeout=10, headers={
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            })
+            response.raise_for_status()
+        except requests.exceptions.SSLError:
+            response = requests.get(url, timeout=10, verify=False, headers={
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            })
+            response.raise_for_status()
         
         # Calculate size in bytes
         size_in_bytes = len(response.content)
@@ -45,6 +59,14 @@ def get_carbon_footprint(url: str) -> Dict[str, Any]:
         return carbon_data
         
     except requests.RequestException as e:
-        raise Exception(f"Error fetching carbon data: {str(e)}")
+        return {
+            "status": "unavailable",
+            "scanUrl": url,
+            "reason": f"Error fetching carbon data: {str(e)}",
+        }
     except Exception as e:
-        raise Exception(f"Error processing carbon data: {str(e)}")
+        return {
+            "status": "unavailable",
+            "scanUrl": url,
+            "reason": f"Error processing carbon data: {str(e)}",
+        }
