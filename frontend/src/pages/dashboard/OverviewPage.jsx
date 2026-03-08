@@ -1,11 +1,12 @@
 import { motion } from 'framer-motion'
-import { Globe, Bug, Radar, Eye, Shield, Server, Activity, Workflow, ChevronRight } from 'lucide-react'
+import { Globe, Bug, FileCode, Radar, Eye, Shield, Server, Activity, Workflow, ChevronRight } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
 const MODULE_CARDS = [
     { title: 'Smart Pipeline', desc: 'Universal multi-tool analysis pipeline', icon: Workflow, to: '/dashboard/smart-pipeline', accent: 'blueStrong' },
     { title: 'Web Analysis', desc: 'DNS, headers, TLS, tech stack scanner', icon: Globe, to: '/dashboard/web', accent: 'cyan' },
     { title: 'Malware Analysis', desc: 'Static & dynamic binary inspection', icon: Bug, to: '/dashboard/malware', accent: 'indigo' },
+    { title: 'Macro Analysis', desc: 'Office macro and VBA threat triage', icon: FileCode, to: '/dashboard/macro', accent: 'amber' },
     { title: 'Steg Analysis', desc: 'Hidden data detection in media files', icon: Eye, to: '/dashboard/steg', accent: 'sky' },
     { title: 'Recon Analysis', desc: 'OSINT & digital footprint tracking', icon: Radar, to: '/dashboard/recon', accent: 'blueStrong' },
 ]
@@ -15,6 +16,7 @@ const accentMap = {
     cyan: { icon: 'text-neon-cyan', bg: 'bg-neon-cyan/10', border: 'border-neon-cyan/25', hoverBorder: 'hover:border-neon-cyan/40' },
     sky: { icon: 'text-sky-300', bg: 'bg-sky-500/10', border: 'border-sky-400/25', hoverBorder: 'hover:border-sky-400/40' },
     indigo: { icon: 'text-indigo-300', bg: 'bg-indigo-500/10', border: 'border-indigo-400/25', hoverBorder: 'hover:border-indigo-400/40' },
+    amber: { icon: 'text-amber-300', bg: 'bg-amber-500/10', border: 'border-amber-400/25', hoverBorder: 'hover:border-amber-400/40' },
 }
 
 export default function OverviewPage() {
@@ -32,7 +34,7 @@ export default function OverviewPage() {
                             <h2 className="text-lg font-bold text-white tracking-tight">
                                 Welcome Back, <span className="text-neon-blue">Analyst</span>
                             </h2>
-                            <p className="text-xs text-foreground/40 font-mono">SecFlow SOC Command Center · 5 modules ready for deployment</p>
+                            <p className="text-xs text-foreground/40 font-mono">SecFlow SOC Command Center · {MODULE_CARDS.length} modules ready for deployment</p>
                         </div>
                     </div>
                     <div className="flex items-center gap-3">

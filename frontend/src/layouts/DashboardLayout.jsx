@@ -5,6 +5,7 @@ import {
     LayoutDashboard,
     Globe,
     Bug,
+    FileCode,
     Eye,
     Radar,
     Menu,
@@ -55,6 +56,7 @@ export default function DashboardLayout() {
             case '/dashboard/smart-pipeline': return 'Smart Pipeline'
             case '/dashboard/web': return 'Web Analysis'
             case '/dashboard/malware': return 'Malware Analysis'
+            case '/dashboard/macro': return 'Macro Analysis'
             case '/dashboard/steg': return 'Steg Analysis'
             case '/dashboard/recon': return 'Recon Analysis'
             case '/dashboard/settings': return 'Settings'
@@ -98,6 +100,7 @@ export default function DashboardLayout() {
                     {!collapsed && <div className="text-[10px] font-mono text-foreground/30 uppercase tracking-wider px-4 mb-2">Analyzers</div>}
                     <SidebarItem to="/dashboard/web" icon={Globe} label="Web Analysis" collapsed={collapsed} />
                     <SidebarItem to="/dashboard/malware" icon={Bug} label="Malware Analysis" collapsed={collapsed} />
+                    <SidebarItem to="/dashboard/macro" icon={FileCode} label="Macro Analysis" collapsed={collapsed} />
                     <SidebarItem to="/dashboard/steg" icon={Eye} label="Steg Analysis" collapsed={collapsed} />
                     <SidebarItem to="/dashboard/recon" icon={Radar} label="Recon Analysis" collapsed={collapsed} />
                 </nav>

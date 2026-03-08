@@ -1,6 +1,6 @@
 import { motion, useInView } from 'framer-motion'
 import { useRef } from 'react'
-import { Github, Heart, Star, GitFork, ExternalLink } from 'lucide-react'
+import { Github, Star, GitFork, ExternalLink } from 'lucide-react'
 
 export function OpenSourceSection() {
     const ref = useRef(null)
@@ -118,14 +118,6 @@ export function OpenSourceSection() {
                         boxShadow: '0 0 50px rgba(41, 197, 255, 0.24)',
                     }}
                 >
-                    <motion.div
-                        className="absolute top-4 right-4"
-                        animate={{ scale: [1, 1.2, 1] }}
-                        transition={{ duration: 1.5, repeat: Infinity }}
-                    >
-                        <Heart className="w-6 h-6 text-red-400 fill-red-400" />
-                    </motion.div>
-
                     <p className="text-neon-cyan font-mono font-bold text-lg md:text-xl max-w-lg">
                         "If you find SecFlow useful, consider supporting its development."
                     </p>

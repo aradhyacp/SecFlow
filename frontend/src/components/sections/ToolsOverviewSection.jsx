@@ -1,7 +1,7 @@
 import { motion, useInView } from 'framer-motion'
 import { useRef } from 'react'
 import { Link } from 'react-router-dom'
-import { Globe, Bug, Eye, Radar, ArrowRight } from 'lucide-react'
+import { Globe, Bug, FileCode, Eye, Radar, ArrowRight } from 'lucide-react'
 
 const tools = [
     {
@@ -48,6 +48,28 @@ const tools = [
             topBar: 'via-blue-400',
         },
         link: '/docs/malware-analysis'
+    },
+    {
+        icon: FileCode,
+        title: 'Macro Analysis',
+        subtitle: 'Document Macro Threat Triage',
+        description:
+            'SecFlow Macro Analyzer triages Office documents for VBA/XLM macro behavior, suspicious execution paths, and extracted IOCs.',
+        highlight: 'Macro extraction, IOC flags, and risk scoring',
+        features: [
+            'Macro extraction from DOC/XLS/PPT families',
+            'AutoExec and suspicious indicator detection',
+            'IOC extraction for URLs, domains, and artifacts',
+            'Risk classification: clean to malicious',
+        ],
+        accent: {
+            text: 'text-blue-300',
+            badge: 'text-blue-300',
+            iconPanel: 'bg-blue-500/10 border-blue-500/30',
+            border: 'hover:border-blue-500/35',
+            topBar: 'via-blue-400',
+        },
+        link: '/docs/macro-analysis'
     },
     {
         icon: Radar,
@@ -143,7 +165,7 @@ export function ToolsOverviewSection() {
                         Core Capabilities
                     </motion.span>
                     <h2 className="font-mono text-4xl font-bold leading-[1.04] tracking-[-0.02em] text-foreground sm:text-5xl md:text-6xl lg:text-[5.15rem]">
-                        <span className="block text-foreground/95">Four Tools,</span>
+                        <span className="block text-foreground/95">Five Tools,</span>
                         <span
                             className="mt-2 block text-neon-blue"
                             style={{ textShadow: '0 0 44px rgba(41, 197, 255, 0.38)' }}

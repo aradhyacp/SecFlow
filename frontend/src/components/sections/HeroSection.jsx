@@ -1,7 +1,7 @@
 import { motion } from 'framer-motion'
 import { Link } from 'react-router-dom'
 import { Button } from '../ui/Button'
-import { Zap, Shield, Search, Eye, Workflow, Layers, GitBranch, FileOutput } from 'lucide-react'
+import { Zap, Shield, Search, Eye, FileCode, Workflow, Layers, GitBranch, FileOutput } from 'lucide-react'
 
 // Animated background component with particles and grid
 function AnimatedBackground() {
@@ -106,6 +106,7 @@ export function HeroSection() {
     const offerings = [
         { icon: Zap, label: 'Web Analysis', desc: 'Deep website intelligence', link: '/dashboard/web' },
         { icon: Shield, label: 'Malware Analysis', desc: 'Forensic file inspection', link: '/dashboard/malware' },
+        { icon: FileCode, label: 'Macro Analysis', desc: 'Office macro threat triage', link: '/dashboard/macro' },
         { icon: Search, label: 'Recon Analysis', desc: 'Digital footprint tracking', link: '/dashboard/recon' },
         { icon: Eye, label: 'Steganography Analysis', desc: 'Hidden Data Detection', link: '/dashboard/steg' },
     ]
@@ -256,7 +257,7 @@ export function HeroSection() {
                                     <span className="w-8 h-px bg-gradient-to-l from-transparent to-neon-blue" />
                                 </h3>
                                 <p className="text-center text-sm leading-relaxed text-foreground/60">
-                                    Explore dedicated analyzers tuned for web, malware, recon, and steganography investigations.
+                                    Explore dedicated analyzers tuned for web, malware, macro, recon, and steganography investigations.
                                 </p>
                             </div>
                             <div className="grid gap-2">

@@ -41,6 +41,7 @@ const StatusBadge = ({ status }) => {
 const ANALYZERS = [
     { key: 'web', label: 'Web Analysis', icon: Globe, desc: 'DNS, SSL, headers, tech stack', accepts: ['url'] },
     { key: 'malware', label: 'Malware Analysis', icon: Bug, desc: 'Static & dynamic binary inspection', accepts: ['exe', 'dll', 'so', 'elf', 'bin', 'o', 'out'] },
+    { key: 'macro', label: 'Macro Analysis', icon: FileCode, desc: 'Office macro and VBA threat triage', accepts: ['doc', 'docx', 'docm', 'xls', 'xlsx', 'xlsm', 'xlsb', 'ppt', 'pptx', 'pptm', 'rtf'] },
     { key: 'steg', label: 'Steg Analysis', icon: Eye, desc: 'Hidden data detection in media', accepts: ['png', 'jpg', 'jpeg', 'bmp', 'gif', 'wav', 'mp3'] },
     { key: 'recon', label: 'Recon Analysis', icon: Radar, desc: 'OSINT & digital footprint', accepts: ['ip', 'domain', 'email', 'phone'] },
 ]
@@ -380,7 +381,7 @@ export default function SmartPipelinePage() {
                                     <div className="text-sm text-foreground/50 mb-1">Drop one evidence file here</div>
                                     <div className="text-[10px] text-foreground/25 font-mono mb-5">CLICK TO BROWSE · ALL FORMATS ACCEPTED</div>
                                     <div className="flex flex-wrap gap-1 justify-center">
-                                        {['EXE', 'DLL', 'PNG', 'JPG', 'PDF', 'BIN', 'WAV', 'ELF', 'LOG'].map(ext => (
+                                        {['DOCM', 'XLSM', 'PPTM', 'DOCX', 'XLSX', 'EXE', 'DLL', 'PNG', 'JPG', 'BIN', 'LOG'].map(ext => (
                                             <span key={ext} className="text-[8px] font-mono px-1.5 py-0.5 rounded bg-white/[0.03] border border-white/[0.04] text-foreground/20">
                                                 .{ext}
                                             </span>
