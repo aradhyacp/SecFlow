@@ -1,6 +1,6 @@
 # Steps 2–3 — TypeScript service shell and OpenRouter model access
 
-**Status:** complete (one manual gate: live OpenRouter call — see §5)
+**Status:** complete, including the live OpenRouter gate.
 
 ---
 
@@ -91,17 +91,18 @@ Documented behaviour changes (intentional):
 cd backend/orchestrator-ts
 npm run typecheck   # clean
 npm run lint        # clean
-npm test            # 37 passed | 1 skipped
+npm test            # 49 passed | 2 skipped without a key
 ```
 
-The skipped test is `tests/integration/openrouter.live.test.ts` — the live OpenRouter structured-output call. It activates automatically when `OPENROUTER_API_KEY` is exported. No key exists in this checkout, so the live call has **not** been executed yet; this is the one outstanding Step 3 gate and is also required for the Step 4 POC.
+The two skipped tests are the live OpenRouter calls
+(`tests/integration/openrouter.live.test.ts` and
+`tests/integration/langgraph.live.test.ts`). They activate automatically when
+`OPENROUTER_API_KEY` is exported. Both were executed against
+`openai/gpt-4.1-mini` and passed, which satisfies the Step 3 structured-output
+exit criterion and the Step 4 live graph gate.
 
 ## 6. Deployment verification
 
 - Docker image builds: `docker build -t secflow-orchestrator-ts:step2 backend/orchestrator-ts`.
 - Container runs as non-root, reports `healthy` via the Docker healthcheck, and `/api/health` + `/api/ready` return 200.
 - Local start verified separately (health 200, ready 200, report 404, graceful SIGTERM).
-
-## 7. Manual actions
-
-1. Export a real `OPENROUTER_API_KEY` and run `npm test` to execute the live provider test.

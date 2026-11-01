@@ -1,6 +1,6 @@
 # Step 4 — LangGraph × OpenRouter proof of concept
 
-**Status:** implemented, automated tests passing, live provider run pending an API key.
+**Status:** complete — automated and live OpenRouter gate passing.
 
 ## What was built
 
@@ -92,12 +92,14 @@ is set. They verify the structured-output path and the full live graph cycle.
 
 ## Exit gate
 
-Step 4's automated test proves the complete cycle with a scripted model. The
-remaining exit criterion is the same cycle against the selected OpenRouter
-model. It requires a real key:
+Step 4's automated test proves the complete cycle with a scripted model, and
+the same cycle was executed against `openai/gpt-4.1-mini` through OpenRouter:
+the live test called `lookup_test_indicator`, received the result, made a final
+decision, and finished in 2 cycles.
+
+Run the live gate any time with:
 
 ```bash
 OPENROUTER_API_KEY=... npm test
 ```
 
-Until that passes, do not start wiring real analyzers (Step 6).
