@@ -1,0 +1,85 @@
+{
+  "_note": "Redacted fixture of the frontend-facing POST /api/smart-analyze?passes=3 response. findings_summary is the serialized FindingsStore (one entry per completed pass).",
+  "job_id": "9f2c4a1b7d3e5f60",
+  "passes_completed": 3,
+  "overall_risk_score": 9.5,
+  "findings_summary": [
+    {
+      "analyzer": "macro",
+      "pass": 1,
+      "input": "/tmp/tmpXXXX_invoice.docm",
+      "findings": [
+        {
+          "type": "macro_malicious",
+          "detail": "2 VBA macro module(s) found in invoice.docm (OpenXML). Flags: auto_exec, has_ioc, suspicious.",
+          "severity": "critical",
+          "evidence": "{\"auto_exec\": true, \"has_ioc\": true, \"obfuscated\": false, \"suspicious\": true}"
+        },
+        {
+          "type": "macro_ioc",
+          "detail": "IOCs extracted from macros: http://recongraph.xyz/payload.exe, payload.exe, update.exe",
+          "severity": "high",
+          "evidence": "[\"http://recongraph.xyz/payload.exe\", \"payload.exe\", \"update.exe\"]"
+        }
+      ],
+      "risk_score": 9.5,
+      "raw_output": "VBA macros: 2 module(s), risk=malicious, flags=[auto_exec, has_ioc, suspicious]\nIOCs:\n  http://recongraph.xyz/payload.exe\n  payload.exe\n  update.exe"
+    },
+    {
+      "analyzer": "recon",
+      "pass": 2,
+      "input": "recongraph.xyz",
+      "findings": [
+        {
+          "type": "geolocation",
+          "detail": "IP geolocation: country=Singapore, ISP=Amazon.com, Inc., AS=AS16509 Amazon.com, Inc.",
+          "severity": "info",
+          "evidence": "{\"status\": \"success\", \"country\": \"Singapore\", \"isp\": \"Amazon.com, Inc.\", \"as\": \"AS16509 Amazon.com, Inc.\"}"
+        },
+        {
+          "type": "ioc_match",
+          "detail": "ThreatFox IOC match: MintsLoader (confidence: 100%)",
+          "severity": "critical",
+          "evidence": "{\"found\": true, \"malware\": \"MintsLoader\", \"confidence_level\": 100}"
+        }
+      ],
+      "risk_score": 4.0,
+      "raw_output": "Recon analysis for: recongraph.xyz\nipapi: {\"country\": \"Singapore\"}\ntalos: blacklisted=False\ntor: is_tor_exit=False\nthreatfox: malware=MintsLoader, confidence=100"
+    },
+    {
+      "analyzer": "web",
+      "pass": 3,
+      "input": "https://recongraph.xyz",
+      "findings": [
+        {
+          "type": "missing_security_header",
+          "detail": "Missing security header: Content-Security-Policy",
+          "severity": "high",
+          "evidence": "Content-Security-Policy"
+        },
+        {
+          "type": "security_headers_summary",
+          "detail": "Security headers score: 12.5 — 7 missing, 1 present",
+          "severity": "info",
+          "evidence": "Server"
+        },
+        {
+          "type": "url_clean",
+          "detail": "URL not found in malware/phishing databases",
+          "severity": "info",
+          "evidence": "malware_check: malicious=False, detections=0, risk=low"
+        }
+      ],
+      "risk_score": 2.5,
+      "raw_output": "Web analysis for: https://recongraph.xyz\nsecurity-headers: score=12.5, missing=[...]\ntls: version=TLSv1.3, cipher={...}\nfirewall: hasWAF=False, waf="
+    }
+  ],
+  "report_paths": {
+    "json": "/app/reports/9f2c4a1b7d3e5f60/report.json",
+    "html": "/app/reports/9f2c4a1b7d3e5f60/report.html"
+  },
+  "report_urls": {
+    "json": "/api/report/9f2c4a1b7d3e5f60/json",
+    "html": "/api/report/9f2c4a1b7d3e5f60/html"
+  }
+}
