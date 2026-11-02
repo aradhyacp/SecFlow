@@ -11,7 +11,9 @@ describe("loadConfig", () => {
     expect(config.model.maxCycles).toBe(4);
     expect(config.model.timeoutMs).toBe(60_000);
     expect(config.analyzerTimeoutMs).toBe(60_000);
+    expect(config.analyzerMaxRetries).toBe(1);
     expect(config.totalAnalysisTimeoutMs).toBe(600_000);
+    expect(config.analyzers.malware.timeoutOverrideMs).toBeUndefined();
     expect(config.maxUploadBytes).toBe(50 * 1024 * 1024);
     expect(config.allowPrivateTargets).toBe(false);
     expect(config.analyzers.malware.baseUrl).toBe(
@@ -35,7 +37,18 @@ describe("loadConfig", () => {
       ANALYZER_MALWARE_TIMEOUT_MS: "180000",
     });
     expect(config.analyzers.malware.timeoutMs).toBe(180_000);
+    expect(config.analyzers.malware.timeoutOverrideMs).toBe(180_000);
     expect(config.analyzers.web.timeoutMs).toBe(1000);
+    expect(config.analyzers.web.timeoutOverrideMs).toBeUndefined();
+  });
+
+  it("bounds the analyzer retry budget", () => {
+    expect(loadConfig({ NODE_ENV: "test", ANALYZER_MAX_RETRIES: "0" }).analyzerMaxRetries).toBe(0);
+    expect(loadConfig({ NODE_ENV: "test", ANALYZER_MAX_RETRIES: "3" }).analyzerMaxRetries).toBe(3);
+    expect(() => loadConfig({ NODE_ENV: "test", ANALYZER_MAX_RETRIES: "6" })).toThrow(ConfigError);
+    expect(() => loadConfig({ NODE_ENV: "test", ANALYZER_MAX_RETRIES: "-1" })).toThrow(
+      ConfigError,
+    );
   });
 
   it("rejects malformed analyzer URLs", () => {

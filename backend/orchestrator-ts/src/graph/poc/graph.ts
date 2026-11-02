@@ -122,7 +122,9 @@ export function buildPocGraph(options: PocGraphOptions) {
       messages.push(
         new ToolMessage({
           content: JSON.stringify(
-            result.ok ? result.output : { error: result.error, kind: result.kind },
+            result.ok
+              ? tools.toModelOutput(call.name, result.output)
+              : { error: result.error, kind: result.kind },
           ),
           tool_call_id: call.id ?? "",
           name: call.name,

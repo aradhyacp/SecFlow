@@ -2,11 +2,19 @@ import { tool as aiTool, type ToolSet } from "ai";
 import type { z } from "zod";
 
 import type { Logger } from "../logger.js";
+import type { RawOutputStore } from "./rawOutputStore.js";
+import type { AnalysisTarget } from "./state.js";
 
 export interface ToolContext {
   runId: string;
   signal?: AbortSignal;
   logger?: Logger;
+  /** 1-indexed pass currently executing. */
+  pass?: number;
+  /** Trusted target catalog for this run, keyed by target id. */
+  targets?: ReadonlyMap<string, AnalysisTarget>;
+  /** Full-output storage used by analyzer tools. */
+  rawOutputStore?: RawOutputStore;
 }
 
 export type ToolFailureKind = "validation" | "execution" | "unknown_tool";
@@ -15,11 +23,13 @@ export type ToolExecutionResult =
   | { ok: true; output: unknown }
   | { ok: false; kind: ToolFailureKind; error: string };
 
-export interface ToolSpec<TInput> {
+export interface ToolSpec<TInput, TOutput = unknown> {
   name: string;
   description: string;
   inputSchema: z.ZodType<TInput>;
-  execute(input: TInput, context: ToolContext): Promise<unknown>;
+  execute(input: TInput, context: ToolContext): Promise<TOutput>;
+  /** Projection sent back to the model; defaults to the raw tool output. */
+  toModelOutput?(output: TOutput): unknown;
 }
 
 export interface RegisteredTool {
@@ -27,6 +37,7 @@ export interface RegisteredTool {
   description: string;
   inputSchema: z.ZodType;
   execute(rawInput: unknown, context: ToolContext): Promise<ToolExecutionResult>;
+  toModelOutput(output: unknown): unknown;
 }
 
 export function formatIssues(error: z.ZodError): string {
@@ -43,11 +54,14 @@ export function formatIssues(error: z.ZodError): string {
  * turned into values, never thrown: graph nodes must be able to feed a tool
  * error back to the model without aborting the run.
  */
-export function defineTool<TInput>(spec: ToolSpec<TInput>): RegisteredTool {
+export function defineTool<TInput, TOutput = unknown>(spec: ToolSpec<TInput, TOutput>): RegisteredTool {
   return {
     name: spec.name,
     description: spec.description,
     inputSchema: spec.inputSchema,
+    toModelOutput(output) {
+      return spec.toModelOutput ? spec.toModelOutput(output as TOutput) : output;
+    },
     async execute(rawInput, context) {
       const parsed = spec.inputSchema.safeParse(rawInput);
       if (!parsed.success) {
@@ -118,5 +132,10 @@ export class ToolRegistry {
       };
     }
     return tool.execute(rawInput, context);
+  }
+
+  /** The provider-facing projection of a tool result. */
+  toModelOutput(name: string, output: unknown): unknown {
+    return this.tools.get(name)?.toModelOutput(output) ?? output;
   }
 }

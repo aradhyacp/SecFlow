@@ -29,6 +29,7 @@ const envSchema = z.object({
   MODEL_MAX_CYCLES: z.coerce.number().int().min(1).max(20).default(4),
 
   ANALYZER_TIMEOUT_MS: z.coerce.number().int().positive().default(60_000),
+  ANALYZER_MAX_RETRIES: z.coerce.number().int().min(0).max(5).default(1),
   TOTAL_ANALYSIS_TIMEOUT_MS: z.coerce.number().int().positive().default(600_000),
 
   ANALYZER_MALWARE_URL: z.string().url().default("http://malware-analyzer:5000/api/malware-analyzer"),
@@ -54,6 +55,8 @@ export type RawEnv = Record<string, string | undefined>;
 export interface AnalyzerEndpointConfig {
   baseUrl: string;
   timeoutMs: number;
+  /** Set only when the per-analyzer timeout env var was provided. */
+  timeoutOverrideMs?: number;
 }
 
 export interface AppConfig {
@@ -74,6 +77,7 @@ export interface AppConfig {
   };
   analyzers: Record<AnalyzerName, AnalyzerEndpointConfig>;
   analyzerTimeoutMs: number;
+  analyzerMaxRetries: number;
   totalAnalysisTimeoutMs: number;
   allowPrivateTargets: boolean;
 }
@@ -130,6 +134,7 @@ export function loadConfig(env: RawEnv = process.env): AppConfig {
     analyzers[name] = {
       baseUrl: url.replace(/\/+$/, ""),
       timeoutMs: override ?? raw.ANALYZER_TIMEOUT_MS,
+      ...(override !== undefined ? { timeoutOverrideMs: override } : {}),
     };
   }
 
@@ -151,6 +156,7 @@ export function loadConfig(env: RawEnv = process.env): AppConfig {
     },
     analyzers,
     analyzerTimeoutMs: raw.ANALYZER_TIMEOUT_MS,
+    analyzerMaxRetries: raw.ANALYZER_MAX_RETRIES,
     totalAnalysisTimeoutMs: raw.TOTAL_ANALYSIS_TIMEOUT_MS,
     allowPrivateTargets: raw.ALLOW_PRIVATE_TARGETS,
   };
