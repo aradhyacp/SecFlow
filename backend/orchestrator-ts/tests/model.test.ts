@@ -147,16 +147,18 @@ describe("createModelClient", () => {
     const config = loadConfig({
       NODE_ENV: "test",
       OPENROUTER_API_KEY: "test-key",
-      OPENROUTER_MODEL: "openai/gpt-4.1-mini",
+      OPENROUTER_MODEL: "nvidia/nemotron-3-ultra-550b-a55b:free",
       MODEL_TEMPERATURE: "0.2",
       MODEL_MAX_TOKENS: "1024",
       MODEL_TIMEOUT_MS: "1234",
     });
 
     const client = createModelClient(config, logger);
-    expect(client.modelId).toBe("openai/gpt-4.1-mini");
+    expect(client.modelId).toBe("nvidia/nemotron-3-ultra-550b-a55b:free");
     expect(client.model).toBeDefined();
-    expect(openRouterModelFactory.createModel(config).modelId).toBe("openai/gpt-4.1-mini");
+    expect(openRouterModelFactory.createModel(config).modelId).toBe(
+      "nvidia/nemotron-3-ultra-550b-a55b:free",
+    );
   });
 
   it("honours an injected model factory", () => {

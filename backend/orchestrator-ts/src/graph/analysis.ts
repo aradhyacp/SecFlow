@@ -13,7 +13,7 @@ import {
   type AvailableAction,
 } from "./availability.js";
 import { buildArtifactTargets } from "./artifacts.js";
-import { DECISION_SYSTEM_PROMPT, buildDecisionPrompt } from "./prompt.js";
+import { DECISION_SYSTEM_PROMPT, buildDecisionPrompt } from "../prompts/decision.js";
 import { decisionSchemaFor, validateDecision } from "./decision.js";
 import { makeErrorId, makeToolRecordId } from "./ids.js";
 import type { RawOutputStore } from "./rawOutputStore.js";

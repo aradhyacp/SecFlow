@@ -84,7 +84,7 @@ export function makeState(
       maxPasses: 3,
       maxCycles: 12,
       maxToolCalls: 20,
-      modelId: "openai/gpt-4.1-mini",
+      modelId: "nvidia/nemotron-3-ultra-550b-a55b:free",
     },
     findings,
     toolHistory: findings.map((result, index) => ({

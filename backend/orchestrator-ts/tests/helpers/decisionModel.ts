@@ -9,7 +9,7 @@ import type {
 import type { AnalysisDecision } from "../../src/graph/decision.js";
 
 export function finish(reasoning = "No further analysis adds value."): AnalysisDecision {
-  return { action: "finish", reasoning };
+  return { action: "finish", targetId: null, reasoning };
 }
 
 export function choose(

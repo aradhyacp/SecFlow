@@ -10,6 +10,7 @@ import { buildReport } from "../src/report/build.js";
 import { pwndocReportSchema } from "../src/report/schema.js";
 import { createReportTool } from "../src/report/tools.js";
 import { fixtureFindings, makeState } from "./helpers/analysisState.js";
+import { ScriptedObjectModel } from "./helpers/generationModel.js";
 
 const VALID_YARA = `rule SecFlow_Test_Payload {
   meta:
@@ -148,6 +149,44 @@ describe("report tool", () => {
     expect(html).toContain("SecFlow Threat Analysis");
     expect(html).toContain("YARA rules");
     expect(html).toContain("invoice.docm");
+  });
+
+  it("uses the optional model narrative without changing the report contract", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "secflow-report-"));
+    tempDirs.push(dir);
+    const state = makeState();
+    const model = new ScriptedObjectModel([
+      {
+        summary: "Model-written executive summary grounded in the recorded findings.",
+        recommendations: ["Quarantine the document.", "Block the observed hostname."],
+      },
+    ]);
+    const tool = createReportTool({
+      reportsDir: dir,
+      model,
+      now: () => new Date("2026-11-01T00:06:00.000Z"),
+    });
+
+    const result = await tool.execute(
+      {},
+      { runId: "run-report-test", jobId: "abcdefabcdefabcd", state },
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      throw new Error(result.error);
+    }
+    const output = result.output as { jsonPath: string };
+    const json = JSON.parse(await readFile(output.jsonPath, "utf8")) as {
+      summary: string;
+      recommendations: string[];
+    };
+    expect(json.summary).toContain("Model-written");
+    expect(json.recommendations).toEqual([
+      "Quarantine the document.",
+      "Block the observed hostname.",
+    ]);
+    expect(model.requests).toHaveLength(1);
+    expect(model.requests[0]?.prompt).toContain("<untrusted_evidence");
   });
 
   it("escapes untrusted finding content in HTML", async () => {

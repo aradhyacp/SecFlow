@@ -73,8 +73,10 @@ only; no pySigma backend conversion is performed.
 
 ## Report generation
 
-`src/report/build.ts` builds the report deterministically from graph state. No
-model call is made, so the report cannot invent findings. The preserved PWNDoc
+`src/report/build.ts` builds the report structure and findings deterministically
+from graph state. An optional narrative model (injected in Step 9) may rewrite
+only `summary` and `recommendations`; a model failure falls back to the
+deterministic text. The report cannot invent findings. The preserved PWNDoc
 fields are:
 
 - `input`, `total_passes`, `overall_risk_score`, `summary`;
@@ -125,14 +127,15 @@ Independent tests cover:
 - end-to-end finalization, insufficient-evidence skips, generation failures, no
   findings, and missing generation tools.
 
-Current suite: **135 passed, 7 skipped** (live OpenRouter/analyzer tests remain
+Current suite: **145 passed, 9 skipped** (live OpenRouter/analyzer tests remain
 gated behind their environment flags).
 
 ## Deviations from the Python implementation
 
-1. Report summary/recommendations are deterministic. The Python reporter asks
-   Groq to enhance these; Step 9 will revisit prompt behavior. The report shape
-   and recommendation coverage otherwise match the existing contract.
+1. Report structure/findings are deterministic; Step 9 adds an optional model
+   narrative for summary and recommendations with a deterministic fallback. The
+   Python reporter asks Groq to enhance similar fields. The report shape and
+   recommendation coverage otherwise match the existing contract.
 2. The HTML template is a functional, self-contained equivalent rather than a
    byte-for-byte port of the Python CSS/markup.
 3. YARA/SIGMA generation and validation are new TS stages; the Python

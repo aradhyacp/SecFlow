@@ -58,15 +58,15 @@ resolves it through the target catalog.
 
 `src/graph/availability.ts` computes the action allowlist:
 
-| Target kind | Tools |
-|---|---|
-| `url` | `analyze_web` |
-| `ip`, `domain`, `email`, `phone`, `username` | `analyze_recon` |
-| `file` classified image | `analyze_steg` |
-| `file` classified document | `analyze_macro` |
-| `file` classified executable | `analyze_malware` |
-| `file` unknown subtype | all three file analyzers |
-| `unknown` | none |
+| Target kind                                  | Tools                    |
+| -------------------------------------------- | ------------------------ |
+| `url`                                        | `analyze_web`            |
+| `ip`, `domain`, `email`, `phone`, `username` | `analyze_recon`          |
+| `file` classified image                      | `analyze_steg`           |
+| `file` classified document                   | `analyze_macro`          |
+| `file` classified executable                 | `analyze_malware`        |
+| `file` unknown subtype                       | all three file analyzers |
+| `unknown`                                    | none                     |
 
 Attempted tool/target pairs are removed from the allowlist, so the model cannot
 request the same call twice. An analyzer failure also consumes the pair; failed
@@ -81,25 +81,25 @@ promoted to targets.
 
 ## Budgets and termination
 
-| Setting | Default | Meaning |
-|---|---|---|
-| `passes` query | 3 (3/4/5) | Analyzer executions requested by the user |
-| `MODEL_MAX_CYCLES` | 12 | Model decisions per run |
-| `MODEL_MAX_TOOL_CALLS` | 20 | Analyzer-tool executions per run |
-| `TOTAL_ANALYSIS_TIMEOUT_MS` | 600 s | Whole-run deadline, propagated as an abort signal |
+| Setting                     | Default   | Meaning                                           |
+| --------------------------- | --------- | ------------------------------------------------- |
+| `passes` query              | 3 (3/4/5) | Analyzer executions requested by the user         |
+| `MODEL_MAX_CYCLES`          | 12        | Model decisions per run                           |
+| `MODEL_MAX_TOOL_CALLS`      | 20        | Analyzer-tool executions per run                  |
+| `TOTAL_ANALYSIS_TIMEOUT_MS` | 600 s     | Whole-run deadline, propagated as an abort signal |
 
 Recorded termination reasons:
 
-| Reason | Status | Cause |
-|---|---|---|
-| `model_finished` | completed | Model returned `finish` with reasoning |
-| `no_artifacts` | completed | No unattempted tool/target pair remains |
-| `max_passes` | stopped | User pass budget reached |
-| `max_cycles` | stopped | Model decision budget reached |
-| `max_tool_calls` | stopped | Tool execution budget reached |
-| `duplicate_analysis` | stopped | Model requested an attempted pair |
-| `unsupported_input` | failed | No tool accepts the input |
-| `fatal_error` | failed | Model contract failure or invalid tool output |
+| Reason               | Status    | Cause                                         |
+| -------------------- | --------- | --------------------------------------------- |
+| `model_finished`     | completed | Model returned `finish` with reasoning        |
+| `no_artifacts`       | completed | No unattempted tool/target pair remains       |
+| `max_passes`         | stopped   | User pass budget reached                      |
+| `max_cycles`         | stopped   | Model decision budget reached                 |
+| `max_tool_calls`     | stopped   | Tool execution budget reached                 |
+| `duplicate_analysis` | stopped   | Model requested an attempted pair             |
+| `unsupported_input`  | failed    | No tool accepts the input                     |
+| `fatal_error`        | failed    | Model contract failure or invalid tool output |
 
 `termination.detail` records the model's finish reasoning or the budget/error
 explanation. Every decision is also logged with run id, pass, tool, target id and
@@ -107,19 +107,25 @@ reasoning.
 
 ## Prompt contents
 
-`src/graph/prompt.ts` sends only validated state:
+`src/prompts/decision.ts` sends only validated state:
 
-- input type, source label, MIME and deterministic classification;
-- the trusted target catalog (`id | kind | display name | origin | MIME`);
-- available tools with their descriptions;
-- per-pass summaries and the latest findings;
-- tool history (status, risk, counts, errors);
+- trusted run facts: input type, source kind, MIME, deterministic
+  classification, counters and budgets;
+- the trusted target id catalog (`id | kind | origin | MIME`) and the trusted
+  action allowlist (`tool | target id`);
+- trusted tool-history aggregates (status, risk, finding count);
+- one `<untrusted_evidence>` block containing target labels, indicators,
+  per-pass summaries, latest findings and tool error text;
 - remaining pass/cycle/tool budgets and the stop conditions.
 
-Analyzer evidence is wrapped in `<untrusted_evidence>` with
-`UNTRUSTED_DATA_POLICY`; target display names and tool errors are JSON-encoded
-labels, and the system prompt states they are data, not instructions. Full raw
-outputs remain outside state and prompts behind `RawOutputRef`.
+Step 9 moved prompt construction into `src/prompts/`. Target display names and
+tool errors are JSON-encoded inside the untrusted block, not in the trusted
+allowlist. Full raw outputs remain outside state and prompts behind
+`RawOutputRef`.
+
+The provider schema uses `targetId: string | null` as a required property because
+OpenAI-compatible strict structured-output modes require every property to be in
+`required`: actions carry an id, `finish` carries `null`.
 
 ## Tests
 

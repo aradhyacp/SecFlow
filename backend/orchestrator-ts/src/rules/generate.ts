@@ -10,7 +10,7 @@ import {
   buildYaraPrompt,
   SIGMA_SYSTEM_PROMPT,
   YARA_SYSTEM_PROMPT,
-} from "./prompts.js";
+} from "../prompts/rules.js";
 import {
   sigmaGenerationDraftSchema,
   yaraGenerationDraftSchema,

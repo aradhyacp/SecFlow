@@ -3,6 +3,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import type { Logger } from "../logger.js";
+import type { ModelClient } from "../model/types.js";
 import { defineTool, type RegisteredTool } from "../graph/tools.js";
 import {
   generateReportInputSchema,
@@ -13,10 +14,13 @@ import {
 import type { AnalysisState } from "../graph/state.js";
 import { buildReport } from "./build.js";
 import { renderReportHtml } from "./html.js";
+import { enhanceReportNarrative } from "./narrative.js";
 import { pwndocReportSchema, type PwndocReport } from "./schema.js";
 
 export interface ReportToolOptions {
   reportsDir: string;
+  /** Optional model for the executive narrative; the report is valid without it. */
+  model?: ModelClient;
   logger?: Logger;
   now?: () => Date;
 }
@@ -80,6 +84,17 @@ export function createReportTool(options: ReportToolOptions): RegisteredTool {
       let report: PwndocReport;
       try {
         report = buildReport(state, now.toISOString());
+        if (options.model) {
+          const narrative = await enhanceReportNarrative(state, report, options.model, {
+            ...(options.logger ? { logger: options.logger } : {}),
+            ...(context.signal ? { signal: context.signal } : {}),
+          });
+          report = {
+            ...report,
+            summary: narrative.summary,
+            recommendations: narrative.recommendations,
+          };
+        }
         const validated = pwndocReportSchema.safeParse(report);
         if (!validated.success) {
           const issues = validated.error.issues

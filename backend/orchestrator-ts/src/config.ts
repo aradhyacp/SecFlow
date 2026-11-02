@@ -23,7 +23,7 @@ const envSchema = z.object({
     .default(50 * 1024 * 1024),
 
   OPENROUTER_API_KEY: z.string().trim().min(1).optional(),
-  OPENROUTER_MODEL: z.string().trim().min(1).default("openai/gpt-4.1-mini"),
+  OPENROUTER_MODEL: z.string().trim().min(1).default("nvidia/nemotron-3-ultra-550b-a55b:free"),
   MODEL_TEMPERATURE: z.coerce.number().min(0).max(2).default(0.1),
   MODEL_MAX_TOKENS: z.coerce.number().int().positive().max(32_000).default(2048),
   MODEL_TIMEOUT_MS: z.coerce.number().int().positive().default(60_000),

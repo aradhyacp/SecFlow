@@ -16,7 +16,7 @@ START → decide (ModelClient, one step) → act (ToolRegistry) → decide → �
 
 - **`decide`** sends the whole LangChain message history to the model as AI SDK
   messages, with the currently registered tools declared but not executable.
-  The SDK therefore *returns* tool calls instead of running them.
+  The SDK therefore _returns_ tool calls instead of running them.
 - **`act`** validates each call against the tool's Zod schema, executes only
   allowlisted tools, appends a `ToolMessage`, and records the execution.
 - The conditional edge after `decide` returns to `act` only while the model
@@ -29,25 +29,25 @@ duplicates the other's behaviour.
 
 ## Packages
 
-| Package | Version | Role |
-|---|---|---|
-| `@langchain/langgraph` | `^1.6.0` (lockfile `1.6.0`) | `StateGraph`, `Annotation`, `START`/`END` |
-| `@langchain/core` | `^1.3.2` (peer) | `BaseMessage`/`AIMessage`/`ToolMessage` state |
-| `ai` | `^7.0.159` | AI SDK `generateText`/`tool` types |
-| `@openrouter/ai-sdk-provider` | `^3.1.0` | OpenRouter chat provider |
+| Package                       | Version                     | Role                                          |
+| ----------------------------- | --------------------------- | --------------------------------------------- |
+| `@langchain/langgraph`        | `^1.6.0` (lockfile `1.6.0`) | `StateGraph`, `Annotation`, `START`/`END`     |
+| `@langchain/core`             | `^1.3.2` (peer)             | `BaseMessage`/`AIMessage`/`ToolMessage` state |
+| `ai`                          | `^7.0.159`                  | AI SDK `generateText`/`tool` types            |
+| `@openrouter/ai-sdk-provider` | `^3.1.0`                    | OpenRouter chat provider                      |
 
 `@langchain/langgraph@1.6.0` accepts `zod ^3.25.32 || ^4.2.0`; the service
 already uses Zod 4.
 
 ## Modules
 
-| File | Responsibility |
-|---|---|
-| `src/graph/tools.ts` | `defineTool()` validation wrapper, `ToolRegistry` allowlist, AI SDK tool declarations |
-| `src/graph/messages.ts` | LangChain message ↔ AI SDK message translation, decision → `AIMessage` |
+| File                     | Responsibility                                                                         |
+| ------------------------ | -------------------------------------------------------------------------------------- |
+| `src/graph/tools.ts`     | `defineTool()` validation wrapper, `ToolRegistry` allowlist, AI SDK tool declarations  |
+| `src/graph/messages.ts`  | LangChain message ↔ AI SDK message translation, decision → `AIMessage`                 |
 | `src/graph/poc/state.ts` | Typed `Annotation.Root` state: messages, cycles, status, final text, usage, executions |
-| `src/graph/poc/tool.ts` | `lookup_test_indicator` — synthetic, network-free POC tool |
-| `src/graph/poc/graph.ts` | Graph builder + `runPoc()` |
+| `src/graph/poc/tool.ts`  | `lookup_test_indicator` — synthetic, network-free POC tool                             |
+| `src/graph/poc/graph.ts` | Graph builder + `runPoc()`                                                             |
 
 ### Safety properties already in place
 
@@ -92,14 +92,15 @@ is set. They verify the structured-output path and the full live graph cycle.
 
 ## Exit gate
 
-Step 4's automated test proves the complete cycle with a scripted model, and
-the same cycle was executed against `openai/gpt-4.1-mini` through OpenRouter:
-the live test called `lookup_test_indicator`, received the result, made a final
-decision, and finished in 2 cycles.
+Step 4's automated test proves the complete cycle with a scripted model. The
+live graph test was originally run against `openai/gpt-4.1-mini`; after the
+Step 9 model change it was rerun against
+`nvidia/nemotron-3-ultra-550b-a55b:free` through OpenRouter. In both cases the
+test called `lookup_test_indicator`, received the result, made a final decision,
+and finished in 2 cycles.
 
 Run the live gate any time with:
 
 ```bash
 OPENROUTER_API_KEY=... npm test
 ```
-

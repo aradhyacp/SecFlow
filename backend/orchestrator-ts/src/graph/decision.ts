@@ -15,19 +15,25 @@ export type DecisionActionName = AnalysisToolName | typeof FINISH_ACTION;
 export const analysisDecisionSchema = z
   .object({
     action: z.enum([...analysisToolNames, FINISH_ACTION]),
-    targetId: z.string().regex(TARGET_ID_PATTERN).optional(),
+    targetId: z.string().regex(TARGET_ID_PATTERN).nullable().optional(),
     reasoning: z.string().min(1).max(2_000),
   })
   .strict();
 export type AnalysisDecision = z.infer<typeof analysisDecisionSchema>;
 
-/** Narrow the enum to the tools that are actually available this cycle. */
+/**
+ * Narrow the enum to the tools that are actually available this cycle.
+ *
+ * `targetId` is required-but-nullable rather than optional: OpenAI-compatible
+ * strict structured-output modes require every property to be listed in
+ * `required`. The model uses `null` for finish and a target id otherwise.
+ */
 export function decisionSchemaFor(tools: readonly AnalysisToolName[]) {
   const actions = [...tools, FINISH_ACTION] as unknown as [string, ...string[]];
   return z
     .object({
       action: z.enum(actions),
-      targetId: z.string().regex(TARGET_ID_PATTERN).optional(),
+      targetId: z.string().regex(TARGET_ID_PATTERN).nullable(),
       reasoning: z.string().min(1).max(2_000),
     })
     .strict();
@@ -56,11 +62,11 @@ export function validateDecision(
 
   const decision = parsed.data;
   if (decision.action === FINISH_ACTION) {
-    if (decision.targetId !== undefined) {
+    if (decision.targetId !== undefined && decision.targetId !== null) {
       return {
         ok: false,
         kind: "invalid",
-        error: "finish must not include a targetId",
+        error: "finish must use a null targetId",
       };
     }
     return { ok: true, action: null, reasoning: decision.reasoning };

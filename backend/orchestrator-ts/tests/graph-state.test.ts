@@ -24,11 +24,7 @@ import {
   generateYaraInputSchema,
   targetRefSchema,
 } from "../src/graph/schema/tools.js";
-import {
-  formatUntrusted,
-  wrapUntrusted,
-  UNTRUSTED_DATA_POLICY,
-} from "../src/graph/untrusted.js";
+import { formatUntrusted, wrapUntrusted, UNTRUSTED_DATA_POLICY } from "../src/graph/untrusted.js";
 
 const fixturePath = fileURLToPath(
   new URL("../../../docs/ts-migration/fixtures/smart-analyze-response.json", import.meta.url),
@@ -66,7 +62,7 @@ function validState(): AnalysisGraphState {
       maxPasses: 3,
       maxCycles: 6,
       maxToolCalls: 8,
-      modelId: "openai/gpt-4.1-mini",
+      modelId: "nvidia/nemotron-3-ultra-550b-a55b:free",
     },
     findings: [],
     toolHistory: [],

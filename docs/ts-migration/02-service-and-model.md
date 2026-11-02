@@ -38,23 +38,23 @@ tests/                     37 unit/contract tests + 1 gated live test
 
 All parsing/validation is centralised. Invalid values fail fast at startup with a readable list of issues.
 
-| Variable | Default | Notes |
-|---|---|---|
-| `OPENROUTER_API_KEY` | — | Required in `production`; optional in dev/test so health checks work. |
-| `OPENROUTER_MODEL` | `openai/gpt-4.1-mini` | No model id is hardcoded anywhere else. |
-| `MODEL_TEMPERATURE` | `0.1` | 0–2 |
-| `MODEL_MAX_TOKENS` | `2048` | |
-| `MODEL_TIMEOUT_MS` | `60000` | Applied per model call via `AbortSignal.timeout`. |
-| `MODEL_MAX_RETRIES` | `2` | SDK-level transient retries. |
-| `MODEL_MAX_CYCLES` | `12` | Model decisions per run; 12 covers the 5-pass max plus finish/validation slack. |
-| `MODEL_MAX_TOOL_CALLS` | `20` | Hard cap on analyzer-tool executions per run. |
-| `ANALYZER_TIMEOUT_MS` | `60000` | Default, overridable per analyzer. |
-| `TOTAL_ANALYSIS_TIMEOUT_MS` | `600000` | Whole-run deadline. |
-| `ANALYZER_{MALWARE,STEG,RECON,WEB,MACRO}_URL` | Docker-internal URLs | Trailing slashes trimmed. |
-| `ANALYZER_*_TIMEOUT_MS` | inherits default | e.g. Ghidra needs 240 s. |
-| `MAX_UPLOAD_BYTES` | `52428800` | 50 MB, matches analyzer caps. |
-| `ALLOW_PRIVATE_TARGETS` | `false` | SSRF guard toggle (wired in Step 10). |
-| `ALLOW_MISSING_OPENROUTER_KEY` | `false` | Dry-run escape hatch; readiness stays 503. |
+| Variable                                      | Default                                  | Notes                                                                           |
+| --------------------------------------------- | ---------------------------------------- | ------------------------------------------------------------------------------- |
+| `OPENROUTER_API_KEY`                          | —                                        | Required in `production`; optional in dev/test so health checks work.           |
+| `OPENROUTER_MODEL`                            | `nvidia/nemotron-3-ultra-550b-a55b:free` | No model id is hardcoded anywhere else.                                         |
+| `MODEL_TEMPERATURE`                           | `0.1`                                    | 0–2                                                                             |
+| `MODEL_MAX_TOKENS`                            | `2048`                                   |                                                                                 |
+| `MODEL_TIMEOUT_MS`                            | `60000`                                  | Applied per model call via `AbortSignal.timeout`.                               |
+| `MODEL_MAX_RETRIES`                           | `2`                                      | SDK-level transient retries.                                                    |
+| `MODEL_MAX_CYCLES`                            | `12`                                     | Model decisions per run; 12 covers the 5-pass max plus finish/validation slack. |
+| `MODEL_MAX_TOOL_CALLS`                        | `20`                                     | Hard cap on analyzer-tool executions per run.                                   |
+| `ANALYZER_TIMEOUT_MS`                         | `60000`                                  | Default, overridable per analyzer.                                              |
+| `TOTAL_ANALYSIS_TIMEOUT_MS`                   | `600000`                                 | Whole-run deadline.                                                             |
+| `ANALYZER_{MALWARE,STEG,RECON,WEB,MACRO}_URL` | Docker-internal URLs                     | Trailing slashes trimmed.                                                       |
+| `ANALYZER_*_TIMEOUT_MS`                       | inherits default                         | e.g. Ghidra needs 240 s.                                                        |
+| `MAX_UPLOAD_BYTES`                            | `52428800`                               | 50 MB, matches analyzer caps.                                                   |
+| `ALLOW_PRIVATE_TARGETS`                       | `false`                                  | SSRF guard toggle (wired in Step 10).                                           |
+| `ALLOW_MISSING_OPENROUTER_KEY`                | `false`                                  | Dry-run escape hatch; readiness stays 503.                                      |
 
 ## 3. HTTP compatibility
 
@@ -70,6 +70,7 @@ Verified by tests (`tests/app.test.ts`, `tests/analyze.test.ts`):
 - Uploads are written to a temp dir (never sent to the model) and deleted in a `finally` block.
 
 Documented behaviour changes (intentional):
+
 - Multipart uploads are capped at `MAX_UPLOAD_BYTES` (413). Python had no cap; analyzers cap at 50 MB / 3 MB anyway.
 - `/api/ready` is additive.
 - A whole-run timeout can return 504 (Python had none).
@@ -82,9 +83,18 @@ Documented behaviour changes (intentional):
 - `decide()` runs exactly one AI SDK step (`stepCountIs(1)`) and returns tool calls; tools deliberately have **no `execute`**, so the graph controls execution and feeds results back. This is the verified adapter pattern for the LangGraph POC.
 - `generateObject()` uses the current `generateText({ output: Output.object({ schema }) })` API (AI SDK 7 deprecates `generateObject`), converting schema failures into `ModelContractError`.
 
-### Model choice evidence (OpenRouter catalogue, fetched 2026-11-01)
+### Model choice (updated 2026-11-02)
 
-`openai/gpt-4.1-mini` is present in the live catalogue with `tools` **and** `structured_outputs` support, 1M context, $0.40/M input / $1.60/M output. 386 of 452 listed models advertise tool support; the default stays overridable through `OPENROUTER_MODEL`.
+The default is `nvidia/nemotron-3-ultra-550b-a55b:free` (NVIDIA Nemotron 3
+Ultra free tier). OpenRouter reports a 1M-token context, free input/output
+pricing, and support for `tools`, `tool_choice`, temperature, and reasoning
+parameters. The catalogue does not advertise `structured_outputs` for this
+model, but the AI SDK `Output.object` path and all gated live tests — structured
+classification, decision allowlisting, and report narrative — passed against it.
+
+The default remains overridable through `OPENROUTER_MODEL`. The earlier Step 3
+evidence used `openai/gpt-4.1-mini`; that run is historical rather than a claim
+about the current default.
 
 ## 5. Tests
 
@@ -92,15 +102,17 @@ Documented behaviour changes (intentional):
 cd backend/orchestrator-ts
 npm run typecheck   # clean
 npm run lint        # clean
-npm test            # 49 passed | 2 skipped without a key
+npm test            # 145 passed | 9 skipped without a key
 ```
 
-The two skipped tests are the live OpenRouter calls
-(`tests/integration/openrouter.live.test.ts` and
+The skipped tests include the live OpenRouter calls
+(`tests/integration/openrouter.live.test.ts`,
+`tests/integration/prompts.live.test.ts`, and
 `tests/integration/langgraph.live.test.ts`). They activate automatically when
-`OPENROUTER_API_KEY` is exported. Both were executed against
-`openai/gpt-4.1-mini` and passed, which satisfies the Step 3 structured-output
-exit criterion and the Step 4 live graph gate.
+`OPENROUTER_API_KEY` is exported. They were rerun against
+`nvidia/nemotron-3-ultra-550b-a55b:free` on 2026-11-02 and passed, covering the
+Step 3 structured-output exit criterion, the Step 4 live graph gate, and the Step
+9 prompt gates.
 
 ## 6. Deployment verification
 

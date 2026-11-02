@@ -7,7 +7,7 @@ describe("loadConfig", () => {
     const config = loadConfig({ NODE_ENV: "test" });
 
     expect(config.port).toBe(5000);
-    expect(config.model.modelId).toBe("openai/gpt-4.1-mini");
+    expect(config.model.modelId).toBe("nvidia/nemotron-3-ultra-550b-a55b:free");
     expect(config.model.maxCycles).toBe(12);
     expect(config.model.maxToolCalls).toBe(20);
     expect(config.model.timeoutMs).toBe(60_000);
@@ -47,9 +47,7 @@ describe("loadConfig", () => {
     expect(loadConfig({ NODE_ENV: "test", ANALYZER_MAX_RETRIES: "0" }).analyzerMaxRetries).toBe(0);
     expect(loadConfig({ NODE_ENV: "test", ANALYZER_MAX_RETRIES: "3" }).analyzerMaxRetries).toBe(3);
     expect(() => loadConfig({ NODE_ENV: "test", ANALYZER_MAX_RETRIES: "6" })).toThrow(ConfigError);
-    expect(() => loadConfig({ NODE_ENV: "test", ANALYZER_MAX_RETRIES: "-1" })).toThrow(
-      ConfigError,
-    );
+    expect(() => loadConfig({ NODE_ENV: "test", ANALYZER_MAX_RETRIES: "-1" })).toThrow(ConfigError);
   });
 
   it("rejects malformed analyzer URLs", () => {
@@ -74,9 +72,9 @@ describe("loadConfig", () => {
     expect(loadConfig({ NODE_ENV: "test", ALLOW_PRIVATE_TARGETS: "1" }).allowPrivateTargets).toBe(
       true,
     );
-    expect(loadConfig({ NODE_ENV: "test", ALLOW_PRIVATE_TARGETS: "false" }).allowPrivateTargets).toBe(
-      false,
-    );
+    expect(
+      loadConfig({ NODE_ENV: "test", ALLOW_PRIVATE_TARGETS: "false" }).allowPrivateTargets,
+    ).toBe(false);
   });
 
   it("rejects invalid numeric ranges", () => {
