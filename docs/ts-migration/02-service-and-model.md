@@ -46,7 +46,8 @@ All parsing/validation is centralised. Invalid values fail fast at startup with 
 | `MODEL_MAX_TOKENS` | `2048` | |
 | `MODEL_TIMEOUT_MS` | `60000` | Applied per model call via `AbortSignal.timeout`. |
 | `MODEL_MAX_RETRIES` | `2` | SDK-level transient retries. |
-| `MODEL_MAX_CYCLES` | `4` | Graph decision/tool cycles (independent of 3/4/5 passes). |
+| `MODEL_MAX_CYCLES` | `12` | Model decisions per run; 12 covers the 5-pass max plus finish/validation slack. |
+| `MODEL_MAX_TOOL_CALLS` | `20` | Hard cap on analyzer-tool executions per run. |
 | `ANALYZER_TIMEOUT_MS` | `60000` | Default, overridable per analyzer. |
 | `TOTAL_ANALYSIS_TIMEOUT_MS` | `600000` | Whole-run deadline. |
 | `ANALYZER_{MALWARE,STEG,RECON,WEB,MACRO}_URL` | Docker-internal URLs | Trailing slashes trimmed. |

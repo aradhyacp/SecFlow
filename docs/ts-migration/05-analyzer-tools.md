@@ -131,4 +131,4 @@ and default to the compose host ports (5001/5002/5003/5005/5006):
 SECFLOW_LIVE_ANALYZERS=1 npm test
 ```
 
-Current suite: **90 passed, 7 skipped** (2 OpenRouter live, 5 analyzer live).
+Current suite at Step 6: **90 passed, 7 skipped** (2 OpenRouter live, 5 analyzer live).

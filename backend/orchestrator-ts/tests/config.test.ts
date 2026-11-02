@@ -8,7 +8,8 @@ describe("loadConfig", () => {
 
     expect(config.port).toBe(5000);
     expect(config.model.modelId).toBe("openai/gpt-4.1-mini");
-    expect(config.model.maxCycles).toBe(4);
+    expect(config.model.maxCycles).toBe(12);
+    expect(config.model.maxToolCalls).toBe(20);
     expect(config.model.timeoutMs).toBe(60_000);
     expect(config.analyzerTimeoutMs).toBe(60_000);
     expect(config.analyzerMaxRetries).toBe(1);

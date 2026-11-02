@@ -23,6 +23,7 @@ state for the orchestrator. It covers everything Step 5 requires:
 | `rules` | YARA and SIGMA artifacts with validation status and evidence refs |
 | `report` | Report status, risk, summary, recommendations, output paths |
 | `termination` | `null` while running; explicit reason/pass/detail once stopped |
+| `pendingAction` | Transient validated tool/target choice between decide and act |
 | `counters` | Passes, cycles, tool calls, duplicate rejections |
 
 Array channels append; `targets` merges by id; scalar channels replace.

@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import { secFlowResultSchema, type SecFlowResult } from "./schema/analyzer.js";
 import { rulesStateSchema, type RulesState } from "./schema/rules.js";
-import { toolNameSchema } from "./schema/tools.js";
+import { analysisToolNameSchema, toolNameSchema, TARGET_ID_PATTERN } from "./schema/tools.js";
 import { internalAnalyzerNameSchema } from "./schema/analyzer.js";
 
 export const INPUT_KINDS = ["file", "target"] as const;
@@ -24,7 +24,16 @@ export const INPUT_TYPES = [
 export const inputTypeSchema = z.enum(INPUT_TYPES);
 export type InputType = z.infer<typeof inputTypeSchema>;
 
-export const TARGET_KINDS = ["file", "url", "ip", "domain", "email", "phone", "username"] as const;
+export const TARGET_KINDS = [
+  "file",
+  "url",
+  "ip",
+  "domain",
+  "email",
+  "phone",
+  "username",
+  "unknown",
+] as const;
 export const targetKindSchema = z.enum(TARGET_KINDS);
 export type TargetKind = z.infer<typeof targetKindSchema>;
 
@@ -72,6 +81,20 @@ export const classificationSchema = z
   .strict();
 export type Classification = z.infer<typeof classificationSchema>;
 
+/**
+ * A model (or deterministic classifier) choice for the next analysis action.
+ * `tool` is an enumerated analyzer tool and `targetId` must resolve through the
+ * trusted target catalog; no path, URL or command is accepted here.
+ */
+export const analysisActionSchema = z
+  .object({
+    tool: analysisToolNameSchema,
+    targetId: z.string().regex(TARGET_ID_PATTERN),
+    reasoning: z.string().min(1).max(2_000),
+  })
+  .strict();
+export type AnalysisAction = z.infer<typeof analysisActionSchema>;
+
 export const analysisContextSchema = z
   .object({
     runId: z.string().min(1).max(200),
@@ -93,14 +116,21 @@ export const toolHistoryEntrySchema = z
     id: z.string().regex(/^tool_[a-f0-9]{16}$/),
     pass: z.number().int().min(0).max(100),
     tool: toolNameSchema,
-    targetId: z.string().regex(/^tgt_[a-f0-9]{16}$/).optional(),
+    targetId: z
+      .string()
+      .regex(/^tgt_[a-f0-9]{16}$/)
+      .optional(),
     status: toolStatusSchema,
     startedAt: z.string().datetime(),
     durationMs: z.number().int().nonnegative(),
     findingCount: z.number().int().nonnegative(),
     riskScore: z.number().min(0).max(10),
-    rawOutputRef: z.string().regex(/^raw_[a-f0-9]{16}$/).optional(),
+    rawOutputRef: z
+      .string()
+      .regex(/^raw_[a-f0-9]{16}$/)
+      .optional(),
     summary: z.string().max(4_000),
+    reasoning: z.string().max(2_000).optional(),
     error: z.string().max(4_000).optional(),
   })
   .strict();
@@ -180,7 +210,15 @@ export const countersSchema = z
   .strict();
 export type RunCounters = z.infer<typeof countersSchema>;
 
-export const INDICATOR_KINDS = ["url", "ip", "domain", "email", "phone", "username", "hash"] as const;
+export const INDICATOR_KINDS = [
+  "url",
+  "ip",
+  "domain",
+  "email",
+  "phone",
+  "username",
+  "hash",
+] as const;
 export const indicatorKindSchema = z.enum(INDICATOR_KINDS);
 export type IndicatorKind = z.infer<typeof indicatorKindSchema>;
 
@@ -218,6 +256,7 @@ export const analysisStateSchema = z
     rules: rulesStateSchema,
     report: reportStateSchema,
     termination: terminationSchema.nullable(),
+    pendingAction: analysisActionSchema.nullable().default(null),
     counters: countersSchema,
   })
   .strict();
@@ -231,7 +270,10 @@ function replace<T>(_current: T, next: T): T {
   return next;
 }
 
-function mergeTargets(left: AnalysisTarget[], right: AnalysisTarget | AnalysisTarget[]): AnalysisTarget[] {
+function mergeTargets(
+  left: AnalysisTarget[],
+  right: AnalysisTarget | AnalysisTarget[],
+): AnalysisTarget[] {
   const merged = new Map(left.map((target) => [target.id, target]));
   for (const target of Array.isArray(right) ? right : [right]) {
     merged.set(target.id, target);
@@ -287,6 +329,7 @@ export const AnalysisStateAnnotation = Annotation.Root({
   rules: Annotation<RulesState>({ reducer: replace, default: () => ({ yara: [], sigma: [] }) }),
   report: Annotation<ReportState>({ reducer: replace, default: emptyReportState }),
   termination: Annotation<Termination | null>({ reducer: replace, default: () => null }),
+  pendingAction: Annotation<AnalysisAction | null>({ reducer: replace, default: () => null }),
   counters: Annotation<RunCounters>({ reducer: replace, default: emptyCounters }),
 });
 

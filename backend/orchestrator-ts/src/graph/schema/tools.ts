@@ -12,7 +12,9 @@ export const TARGET_ID_PATTERN = /^tgt_[a-z0-9]{8,32}$/;
  */
 export const targetRefSchema = z
   .object({
-    targetId: z.string().regex(TARGET_ID_PATTERN, "targetId must reference a known analysis target"),
+    targetId: z
+      .string()
+      .regex(TARGET_ID_PATTERN, "targetId must reference a known analysis target"),
   })
   .strict();
 export type TargetRef = z.infer<typeof targetRefSchema>;
@@ -24,6 +26,8 @@ export const analysisToolNames = [
   "analyze_web",
   "analyze_macro",
 ] as const;
+
+export const analysisToolNameSchema = z.enum(analysisToolNames);
 
 export const generationToolNames = ["generate_yara", "generate_sigma", "generate_report"] as const;
 

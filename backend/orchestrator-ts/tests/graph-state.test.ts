@@ -80,6 +80,7 @@ function validState(): AnalysisGraphState {
       recommendations: [],
     },
     termination: null,
+    pendingAction: null,
     counters: { passes: 0, cycles: 0, toolCalls: 0, duplicateRejections: 0 },
   };
 }

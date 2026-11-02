@@ -13,12 +13,14 @@ const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   PORT: z.coerce.number().int().min(1).max(65_535).default(5000),
   HOST: z.string().min(1).default("0.0.0.0"),
-  LOG_LEVEL: z
-    .enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"])
-    .default("info"),
+  LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"]).default("info"),
 
   REPORTS_DIR: z.string().min(1).default("./reports"),
-  MAX_UPLOAD_BYTES: z.coerce.number().int().positive().default(50 * 1024 * 1024),
+  MAX_UPLOAD_BYTES: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(50 * 1024 * 1024),
 
   OPENROUTER_API_KEY: z.string().trim().min(1).optional(),
   OPENROUTER_MODEL: z.string().trim().min(1).default("openai/gpt-4.1-mini"),
@@ -26,13 +28,18 @@ const envSchema = z.object({
   MODEL_MAX_TOKENS: z.coerce.number().int().positive().max(32_000).default(2048),
   MODEL_TIMEOUT_MS: z.coerce.number().int().positive().default(60_000),
   MODEL_MAX_RETRIES: z.coerce.number().int().min(0).max(10).default(2),
-  MODEL_MAX_CYCLES: z.coerce.number().int().min(1).max(20).default(4),
+  /** Model decisions per run. Must leave room for max passes plus a finish call. */
+  MODEL_MAX_CYCLES: z.coerce.number().int().min(1).max(20).default(12),
+  MODEL_MAX_TOOL_CALLS: z.coerce.number().int().min(1).max(50).default(20),
 
   ANALYZER_TIMEOUT_MS: z.coerce.number().int().positive().default(60_000),
   ANALYZER_MAX_RETRIES: z.coerce.number().int().min(0).max(5).default(1),
   TOTAL_ANALYSIS_TIMEOUT_MS: z.coerce.number().int().positive().default(600_000),
 
-  ANALYZER_MALWARE_URL: z.string().url().default("http://malware-analyzer:5000/api/malware-analyzer"),
+  ANALYZER_MALWARE_URL: z
+    .string()
+    .url()
+    .default("http://malware-analyzer:5000/api/malware-analyzer"),
   ANALYZER_STEG_URL: z.string().url().default("http://steg-analyzer:5000/api/steg-analyzer"),
   ANALYZER_RECON_URL: z.string().url().default("http://recon-analyzer:5000/api/Recon-Analyzer"),
   ANALYZER_WEB_URL: z.string().url().default("http://web-analyzer:5000/api/web-analyzer"),
@@ -74,6 +81,7 @@ export interface AppConfig {
     timeoutMs: number;
     maxRetries: number;
     maxCycles: number;
+    maxToolCalls: number;
   };
   analyzers: Record<AnalyzerName, AnalyzerEndpointConfig>;
   analyzerTimeoutMs: number;
@@ -121,7 +129,11 @@ export function loadConfig(env: RawEnv = process.env): AppConfig {
 
   const raw = parsed.data;
 
-  if (raw.NODE_ENV === "production" && !raw.OPENROUTER_API_KEY && !raw.ALLOW_MISSING_OPENROUTER_KEY) {
+  if (
+    raw.NODE_ENV === "production" &&
+    !raw.OPENROUTER_API_KEY &&
+    !raw.ALLOW_MISSING_OPENROUTER_KEY
+  ) {
     throw new ConfigError(
       "OPENROUTER_API_KEY is required in production (set ALLOW_MISSING_OPENROUTER_KEY=true only for dry runs)",
     );
@@ -153,6 +165,7 @@ export function loadConfig(env: RawEnv = process.env): AppConfig {
       timeoutMs: raw.MODEL_TIMEOUT_MS,
       maxRetries: raw.MODEL_MAX_RETRIES,
       maxCycles: raw.MODEL_MAX_CYCLES,
+      maxToolCalls: raw.MODEL_MAX_TOOL_CALLS,
     },
     analyzers,
     analyzerTimeoutMs: raw.ANALYZER_TIMEOUT_MS,
