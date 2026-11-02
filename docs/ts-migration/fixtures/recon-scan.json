@@ -1,0 +1,53 @@
+{
+  "_note": "Redacted fixture of POST {RECON_ANALYZER_URL}/scan with body {\"query\": \"recongraph.xyz\"}. /scan returns tranco + threatfox only for domains.",
+  "query": "recongraph.xyz",
+  "ipapi": {
+    "ip_info": [
+      {
+        "status": "success",
+        "country": "Singapore",
+        "countryCode": "SG",
+        "region": "01",
+        "regionName": "Central Singapore",
+        "city": "Singapore",
+        "zip": "",
+        "lat": 1.3521,
+        "lon": 103.8198,
+        "timezone": "Asia/Singapore",
+        "isp": "Amazon.com, Inc.",
+        "org": "AWS EC2",
+        "as": "AS16509 Amazon.com, Inc.",
+        "query": "203.0.113.10"
+      }
+    ],
+    "dns_info": {
+      "dns": {
+        "geo": "Singapore, SG",
+        "ip": "203.0.113.10"
+      },
+      "edns": {
+        "ecs": "203.0.113.0/24"
+      }
+    }
+  },
+  "talos": {
+    "blacklisted": false
+  },
+  "tor": {
+    "is_tor_exit": false
+  },
+  "tranco": {
+    "found": false,
+    "rank": null
+  },
+  "threatfox": {
+    "found": true,
+    "id": "1234567",
+    "ioc": "recongraph.xyz",
+    "threat_type": "payload_delivery",
+    "malware": "MintsLoader",
+    "confidence_level": 100,
+    "reference": "https://threatfox.abuse.ch/ioc/1234567/",
+    "link": "https://threatfox.abuse.ch/ioc/1234567/"
+  }
+}

@@ -11,28 +11,38 @@
 # Steg dependencies (PostgreSQL + Redis + RQ worker) are also included.
 #
 # Usage:
-#   cp .env.example .env      # fill in GROQ_API_KEY, VIRUSTOTAL_API_KEY
+#   cp .env.example .env      # fill in OPENROUTER_API_KEY, VIRUSTOTAL_API_KEY
 #   docker compose up --build
 
 services:
 
-  # ── Orchestrator ────────────────────────────────────────────────────────────
+  # ── Orchestrator (TypeScript + LangGraph.js) ───────────────────────────────
   orchestrator:
     build:
-      context: ./orchestrator
+      context: ./orchestrator-ts
       dockerfile: Dockerfile
     container_name: secflow-orchestrator
     ports:
       - "5000:5000"
     environment:
-      - GROQ_API_KEY=${GROQ_API_KEY}
-      - MALWARE_ANALYZER_URL=http://malware-analyzer:5000/api/malware-analyzer
-      - STEG_ANALYZER_URL=http://steg-analyzer:5000/api/steg-analyzer
-      - RECON_ANALYZER_URL=http://recon-analyzer:5000/api/Recon-Analyzer
-      - WEB_ANALYZER_URL=http://web-analyzer:5000/api/web-analyzer
-      - MACRO_ANALYZER_URL=http://macro-analyzer:5000/api/macro-analyzer
-      - MAX_PASSES=${MAX_PASSES:-3}
-      - PYTHONUNBUFFERED=1
+      - NODE_ENV=production
+      - PORT=5000
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - OPENROUTER_MODEL=${OPENROUTER_MODEL:-nvidia/nemotron-3-ultra-550b-a55b:free}
+      - MODEL_MAX_CYCLES=${MODEL_MAX_CYCLES:-12}
+      - MODEL_MAX_TOKENS=${MODEL_MAX_TOKENS:-2048}
+      - MODEL_TIMEOUT_MS=${MODEL_TIMEOUT_MS:-60000}
+      - ANALYZER_MALWARE_URL=http://malware-analyzer:5000/api/malware-analyzer
+      - ANALYZER_STEG_URL=http://steg-analyzer:5000/api/steg-analyzer
+      - ANALYZER_RECON_URL=http://recon-analyzer:5000/api/Recon-Analyzer
+      - ANALYZER_WEB_URL=http://web-analyzer:5000/api/web-analyzer
+      - ANALYZER_MACRO_URL=http://macro-analyzer:5000/api/macro-analyzer
+      - ANALYZER_TIMEOUT_MS=${ANALYZER_TIMEOUT_MS:-60000}
+      - TOTAL_ANALYSIS_TIMEOUT_MS=${TOTAL_ANALYSIS_TIMEOUT_MS:-600000}
+      - MAX_UPLOAD_BYTES=${MAX_UPLOAD_BYTES:-52428800}
+      - ALLOW_PRIVATE_TARGETS=${ALLOW_PRIVATE_TARGETS:-false}
+      - REPORTS_DIR=/app/reports
     volumes:
       - ./reports:/app/reports
     depends_on:
@@ -50,7 +60,13 @@ services:
       - secflow-net
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5000/api/health"]
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:5000/api/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))",
+        ]
       interval: 30s
       timeout: 10s
       retries: 3

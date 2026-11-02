@@ -2,6 +2,13 @@
 
 This document covers everything needed to wire the existing `Recon-Analyzer` service into the SecFlow pipeline. It is based on the **actual source code** in `backend/Recon-Analyzer/` — not the generic placeholder docs.
 
+> **Implementation note:** the active adapter is
+> `backend/orchestrator-ts/src/analyzers/adapters/recon.ts`, and the HTTP
+> client is `backend/orchestrator-ts/src/analyzers/clients/recon.ts`. The
+> Python snippets below are retained as the integration specification; see
+> [ts-migration/11-cutover.md](ts-migration/11-cutover.md) for the active
+> service.
+
 ---
 
 ## Table of Contents

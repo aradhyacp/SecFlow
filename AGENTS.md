@@ -6,9 +6,9 @@ This file defines the agent architecture for SecFlow and provides instructions f
 
 ## Project Context
 
-**SecFlow** is a Python-based automated threat analysis pipeline. Its core is a loop-driven orchestrator that routes any input (file, URL, IP, domain, image) through specialized analyzers, guided by Gemini AI tool-calling, and produces PWNDoc reports.
+**SecFlow** is an automated threat analysis pipeline. Its core is a TypeScript/Node.js orchestrator built on a single LangGraph.js state graph. It routes any input (file, URL, IP, domain, image) through specialized Python analyzer microservices over HTTP, uses an OpenRouter-hosted model for evidence-based routing and rule/report generation, and produces PWNDoc reports.
 
-The backend is the primary focus. The frontend is not yet under development.
+The backend is the primary focus. The frontend is not under active development; preserve its existing API contract.
 
 ---
 
@@ -20,53 +20,56 @@ SecFlow's runtime pipeline is composed of the following agents/workers:
 
 ### 1. Pipeline Orchestrator
 
-**File location:** `backend/orchestrator/`
+**File location:** `backend/orchestrator-ts/`
 **Responsibility:**
-- Receives the user's input and hands it to the Input Classifier for the first pass.
-- After each analyzer pass, receives the analyzer output and routes it to the AI Decision Engine.
-- Maintains loop state: current pass count, max passes, termination flags.
-- Writes every pass's output to the Findings Store.
-- Triggers Report Generation when the loop ends.
+- Express service exposing `POST /api/smart-analyze`, `GET /api/health`, `GET /api/ready`, and `GET /api/report/:jobId/:fmt`.
+- Runs one LangGraph.js state graph (`src/graph/`) that classifies input, runs the first deterministic analyzer, then loops through bounded model decisions and analyzer tools.
+- Maintains run state: pass count, model/tool budgets, target catalog, evidence store, termination reason.
+- Accumulates every pass in graph state plus the run-scoped raw-output store.
+- Runs YARA-X, SIGMA, and report stages after the loop and returns the legacy API response shape.
 
 **Key behaviors:**
-- Loop runs for a user-configured max (3, 4, or 5 passes).
-- Terminates early if the AI Decision Engine signals no further analyzers are relevant.
+- Loop runs for a user-configured max (3, 4, or 5 passes) and stops early when the model returns `finish`.
+- Model/tool calls are capped by `MODEL_MAX_CYCLES`, `MODEL_MAX_TOOL_CALLS`, per-call timeouts, and `TOTAL_ANALYSIS_TIMEOUT_MS`.
 - Must never call AI on the first pass if a deterministic rule applies.
+- Is invoked through the TypeScript runner only; analyzer services remain separate containers.
 
 ---
 
 ### 2. Input Classifier
 
-**File location:** `backend/classifier/`
+**File location:** `backend/orchestrator-ts/src/classifier/`
 **Responsibility:**
-- Identifies the type of the user's input using the `file` system command and `python-magic`.
+- Identifies file input from magic bytes, MIME hints, and extension (`sniff.ts`, `rules.ts`).
+- Identifies string input with the existing routing regexes.
 - Applies deterministic routing rules to select the first analyzer:
   - Image (PNG, JPG, BMP, GIF…) → Steganography Analyzer
-  - Executable / PE / binary → Malware Analyzer
+  - Office / OLE2 / OpenXML / RTF document → Macro Analyzer
+  - Executable / PE / ELF / Mach-O / binary → Malware Analyzer
   - URL string → Web Vulnerability Analyzer
-  - IP address / domain → Reconnaissance Analyzer
-- Fallback: if file type is ambiguous or unknown, passes `file`/`python-magic` output + first 100 lines of the file to the AI Decision Engine for classification.
+  - IP address / domain / email / phone → Reconnaissance Analyzer
+- Fallback: if the type is ambiguous or unknown, exposes the applicable analyzer tools to the model and includes a bounded, untrusted file-head preview in the prompt.
 
 **Key behaviors:**
 - No AI is invoked on the first pass when a deterministic rule matches.
-- For unknown types, always include `head -100` of the input alongside `file`/`python-magic` output when calling AI.
+- URL rules are checked before domain rules.
+- Uploads are never sent to the model; only the bounded preview and evidence summaries are.
 
 ---
 
 ### 3. AI Decision Engine
 
-**File location:** `backend/ai/`
+**File location:** `backend/orchestrator-ts/src/model/` and `backend/orchestrator-ts/src/graph/decision.ts`
 **Responsibility:**
-- Wraps the Gemini API with tool-calling capability.
-- Takes analyzer output (or classifier output for unknown types) and returns the name of the next analyzer to call (or a termination signal).
-- Implements the keyword-grep fallback:
-  - If Gemini's response lacks confidence → pass the full analyzer output.
-  - If output is noisy → grep a predefined keyword list; pass matched snippets to Gemini.
+- Wraps OpenRouter through the Vercel AI SDK (`@openrouter/ai-sdk-provider` + `ai`).
+- Takes the current findings/evidence summary and returns a tool call (`analyze_malware`, `analyze_steg`, `analyze_recon`, `analyze_web`, `analyze_macro`, `generate_yara`, `generate_sigma`, `generate_report`) or `finish`.
+- Uses structured-output schemas and re-validates every decision in the graph.
 
 **Key behaviors:**
-- Must return a structured response containing: `next_tool` (string | null) and `reasoning` (string).
-- `next_tool: null` = the loop should terminate.
-- Keyword list for fallback grep is maintained in `backend/ai/keywords.txt`.
+- Analysis tools accept only `{ targetId }`; ids must resolve in the trusted per-run target catalog.
+- `finish` terminates the loop; the enum only exposes tools available for the current state.
+- Evidence comes from the run-scoped raw-output store; the model never receives unbounded analyzer dumps or raw sample bytes.
+- Prompts live in `backend/orchestrator-ts/src/prompts/` and wrap analyzer evidence in `<untrusted_evidence>` boundaries.
 
 ---
 
@@ -325,102 +328,100 @@ requests.post("http://web-analyzer:5005/api/web-analyzer/", json={"url": target_
 
 ### 8. Findings Store
 
-**File location:** `backend/store/`
+**File location:** `backend/orchestrator-ts/src/graph/state.ts` and `rawOutputStore.ts`
 **Responsibility:**
-- Persistent in-memory (and optionally on-disk) accumulator for all analyzer outputs across all loop passes.
-- Appends new findings after every pass.
-- Provides the full findings history to the Report Generator.
+- LangGraph state accumulates every adapter-normalized analyzer result across all passes.
+- The run-scoped raw-output store retains bounded raw evidence for decision prompts and rule generation.
+- The report stage receives the full findings history.
 
 **Key behaviors:**
 - Must preserve pass order and analyzer identity in every entry.
-- Should expose a method to serialize findings to JSON for the report generator.
+- Raw evidence is capped; the model receives references/summaries, not unbounded output.
+- Reports are written under `REPORTS_DIR/<16-hex job id>/`.
 
 ---
 
 ### 9. Report Generator
 
-**File location:** `backend/reporter/`
+**File location:** `backend/orchestrator-ts/src/report/` and `src/rules/`
 **Responsibility:**
-- Takes the full Findings Store contents and passes them to Gemini AI for formatting.
-- Produces a PWNDoc-compatible report in three formats: JSON, PDF, HTML.
-- The report includes: threat summary per analyzer, overall risk score, actionable recommendations, findings timeline.
+- Takes the findings summary and evidence references, generates optional narrative text with OpenRouter, and renders a PWNDoc-compatible JSON + self-contained HTML report.
+- Generates YARA rules compiled by YARA-X and structurally validated SIGMA rules with evidence citations.
+- Includes per-analyzer findings, overall risk score, recommendations, IOCs, and MITRE ATT&CK mappings.
 
 **Key behaviors:**
-- Pass the complete findings store as structured JSON to Gemini, not raw text.
-- Validate the Gemini-formatted output against the PWNDoc schema before writing to file.
+- Pass structured findings/evidence to the model, not raw text blobs.
+- Validate generated rules and report data against their Zod schemas before writing files.
+- Never fabricate analyzer results; failures remain visible as findings/errors.
 
 ---
 
 ## Coding Conventions
 
 ### Language & Style
-- **Python 3.11+** for all backend code.
-- **Flask** for all HTTP service entrypoints.
+- **TypeScript/Node.js 20+** for the orchestrator (`backend/orchestrator-ts/`).
+- **Python 3.11+ / Flask** for analyzer microservices only.
 - **Docker + Docker Compose** for service orchestration.
-- Use **type hints** on all function signatures.
-- Format with **black** and lint with **ruff**.
-- Each analyzer service is its own Docker container with its own `Dockerfile` and `requirements.txt`.
+- Orchestrator: strict TypeScript, Zod schemas, ESLint + Prettier, `npm run typecheck && npm run lint && npm test`.
+- Analyzers: type hints, **black**, **ruff**; each has its own `Dockerfile` and `requirements.txt`.
 
 ### Analyzer Output Contract
-Every analyzer must return a dict conforming to:
-```python
+Every adapter produces the SecFlow contract:
+```ts
 {
-    "analyzer": str,          # e.g. "malware", "steg", "recon", "web"
-    "pass": int,              # loop iteration number (1-indexed)
-    "input": str,             # what was passed to this analyzer
-    "findings": list[dict],   # list of individual finding objects
-    "risk_score": float,      # 0.0 – 10.0
-    "raw_output": str         # raw tool/command output (for AI consumption)
+  analyzer: "malware" | "steg" | "recon" | "web" | "macro",
+  pass: number,              // loop iteration number (1-indexed)
+  input: string,             // what was passed to this analyzer
+  findings: Finding[],       // list of individual finding objects
+  risk_score: number,        // 0.0 – 10.0
+  raw_output: string         // bounded raw evidence for decisions/reporting
 }
 ```
 
 ### AI Decision Engine Contract
-The AI Decision Engine must return:
-```python
+The model decision is a validated structured object:
+```ts
 {
-    "next_tool": str | None,  # "malware" | "steg" | "recon" | "web" | None
-    "reasoning": str          # explanation of the decision
+  action: "analyze_malware" | "analyze_steg" | "analyze_recon" |
+          "analyze_web" | "analyze_macro" | "generate_yara" |
+          "generate_sigma" | "generate_report" | "finish",
+  targetId: string | null,   // required for analyzer actions; null for finish
+  reasoning: string          // explanation of the decision (1–2000 chars)
 }
 ```
 
 ### Error Handling
-- Analyzers must never crash the pipeline. Wrap tool calls in try/except and return an error entry in `findings` instead.
-- The Orchestrator must log all loop decisions (pass number, tool chosen, reasoning) for audit.
+- Analyzer failures must never crash the whole pipeline. Record a structured tool error/finding and continue when other evidence exists.
+- The orchestrator must log all loop decisions (run id, pass, tool, target id, reasoning, duration) for audit.
+- Do not fabricate analyzer output; if a run produces no findings, return the documented 500 error.
 
 ### File Naming
 ```
 backend/
-  orchestrator/                    ← NEW Docker service (port 5000)
-    app/
-      __init__.py
-      routes.py                      ← Flask: POST /api/smart-analyze
-      orchestrator.py                ← Pipeline loop (calls analyzers via HTTP)
-      classifier/
-        classifier.py
-        rules.py
-      ai/
-        engine.py
-        keywords.txt
-      adapters/                      ← Translate analyzer responses → SecFlow contract
-        malware_adapter.py
-        steg_adapter.py
-        recon_adapter.py
-        url_adapter.py
-        web_adapter.py
-      store/
-        findings_store.py
-      reporter/
-        report_generator.py
-        pwndoc_schema.json
+  orchestrator-ts/                 ← TypeScript + LangGraph orchestrator (port 5000)
+    src/
+      index.ts                     ← Express bootstrap
+      app.ts                       ← App factory + middleware
+      config.ts                    ← Zod environment config
+      routes/                      ← smart-analyze, health, reports
+      classifier/                  ← magic-byte + string classification rules
+      graph/                       ← LangGraph state, decision, loop, finalize
+      analyzers/                   ← HTTP clients, adapters, validated tools
+      pipeline/                    ← runner, uploads, payload downloader
+      security/                    ← SSRF/network guard
+      rules/                       ← YARA-X + SIGMA generation/validation
+      report/                      ← PWNDoc JSON/HTML + narrative
+      prompts/                     ← centralized evidence-isolated prompts
+      model/                       ← OpenRouter provider + model adapter
+    tests/                         ← unit, contract, parity, live-gated tests
     Dockerfile
-    requirements.txt
-    .env.example
-  Malware-Analyzer/                  ← REAL SOURCE (Docker service, host port 5001, container port 5000)
-  steg-analyzer/                     ← Analyzer microservice (Docker service, port 5002)
-  Recon-Analyzer/                    ← REAL SOURCE (Docker service, host port 5003, container port 5000)
-  url-analyzer/                      ← Analyzer microservice (Docker service, port 5004, internal)
-  web-analyzer/                      ← Analyzer microservice (Docker service, port 5005)
-  compose.yml                        ← Includes all 6 services
+    package.json
+  Malware-Analyzer/                ← Analyzer (port 5001)
+  Steg-Analyzer/                   ← Analyzer (port 5002)
+  Recon-Analyzer/                  ← Analyzer (port 5003)
+  Web-Analyzer/                    ← Analyzer (port 5005)
+  macro-analyzer/                  ← Analyzer (port 5006)
+  compose.yml                      ← All services on secflow-net
   .env.example
 ```
 
@@ -429,12 +430,13 @@ backend/
 ## What NOT to Do
 
 - Do not call the AI Decision Engine on the first pass when a deterministic classifier rule matches.
-- Do not skip writing to the Findings Store after any pass.
-- Do not generate a report unless the loop has completed (either max passes or early termination).
-- Do not hardcode the Gemini API key — use environment variables (`GEMINI_API_KEY`).
-- Do not import analyzer code directly into the orchestrator — always call analyzers via HTTP using their service URLs.
-- Do not modify analyzer service code to fit the SecFlow contract — use adapters in `orchestrator/app/adapters/` to translate responses.
-- Do not expose the `url-analyzer` as a public API route — it is an internal service called only by the Orchestrator.
+- Do not skip accumulating a pass result in graph state after any analyzer call.
+- Do not generate a report unless the loop has completed (max passes, `finish`, or a configured limit).
+- Do not hardcode the OpenRouter API key — use `OPENROUTER_API_KEY`.
+- Do not import analyzer code into the orchestrator — always call analyzers via HTTP using their service URLs.
+- Do not modify analyzer service code to fit the SecFlow contract — update the adapters in `orchestrator-ts/src/analyzers/adapters/`.
+- Do not remove or rewrite Python analyzer services or their dependencies.
+- Do not allow model output to choose arbitrary URLs, files, commands, or analyzer endpoints; analyzer tools accept only trusted `targetId` values.
 - Do not implement frontend features until explicitly instructed.
 
 ---
@@ -449,3 +451,4 @@ backend/
 - [docs/implementation-guide.md](docs/implementation-guide.md) — Hands-on implementation guide with code snippets
 - [docs/Malware-Analyzer-Orchestration.md](docs/Malware-Analyzer-Orchestration.md) — Malware Analyzer integration details (real endpoints, adapter, compose config)
 - [docs/Recon-Analyzer-Orchestration.md](docs/Recon-Analyzer-Orchestration.md) — Recon Analyzer integration details (real endpoints, adapter, compose config)
+- [docs/ts-migration/](docs/ts-migration/) — TypeScript/LangGraph migration record, parity results, and documented deviations

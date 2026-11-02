@@ -2,6 +2,11 @@
 
 This guide explains how to integrate your existing `Malware-Analyzer` service into the SecFlow orchestration pipeline without rewriting analyzer internals.
 
+> **Implementation note:** the active Steg adapter is
+> `backend/orchestrator-ts/src/analyzers/adapters/steg.ts`. The Python adapter
+> references below are retained as integration history; see
+> [ts-migration/11-cutover.md](ts-migration/11-cutover.md).
+
 ## Goal
 
 Use the analyzer as an external HTTP microservice and normalize its response through an adapter so the orchestrator can:

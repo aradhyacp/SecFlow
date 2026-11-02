@@ -1,0 +1,110 @@
+{
+  "_note": "Redacted subset of example_reports/report.json showing the report contract consumed by GET /api/report/<job_id>/json. Passes/findings are trimmed; threat_intel mirrors the three Groq calls in threat_intel.py.",
+  "input": "/tmp/tmpXXXX_invoice.docm",
+  "total_passes": 3,
+  "overall_risk_score": 9.5,
+  "summary": "The analysis identified a high-risk malicious VBA macro in a document, with indicators of command-and-control communication and potential payload delivery. Additionally, the web analysis revealed multiple missing security headers, increasing exposure to web-based attacks.",
+  "passes": [
+    {
+      "pass_number": 1,
+      "analyzer": "macro",
+      "findings": [
+        {
+          "type": "macro_malicious",
+          "detail": "2 VBA macro module(s) found in invoice.docm (OpenXML). Flags: auto_exec, has_ioc, suspicious.",
+          "severity": "critical",
+          "evidence": "{\"auto_exec\": true, \"has_ioc\": true, \"obfuscated\": false, \"suspicious\": true}"
+        },
+        {
+          "type": "macro_source",
+          "detail": "Full VBA source across 2 module(s)",
+          "severity": "info",
+          "evidence": "--- Module: Module1 (stream: Macros/Module1) ---\nSub AutoOpen()\nEnd Sub"
+        }
+      ]
+    },
+    {
+      "pass_number": 2,
+      "analyzer": "recon",
+      "findings": [
+        {
+          "type": "geolocation",
+          "detail": "IP geolocation: country=Singapore, ISP=Amazon.com, Inc., AS=AS16509 Amazon.com, Inc.",
+          "severity": "info",
+          "evidence": "{\"country\": \"Singapore\", \"isp\": \"Amazon.com, Inc.\"}"
+        }
+      ]
+    },
+    {
+      "pass_number": 3,
+      "analyzer": "web",
+      "findings": [
+        {
+          "type": "missing_security_header",
+          "detail": "Missing security header: Content-Security-Policy",
+          "severity": "high",
+          "evidence": "Content-Security-Policy"
+        }
+      ]
+    }
+  ],
+  "recommendations": [
+    "Isolate any host that opened the document and block http://recongraph.xyz at the egress proxy.",
+    "Deploy the generated YARA and SIGMA rules to EDR and SIEM respectively.",
+    "Add the missing Content-Security-Policy and other security headers to the web service."
+  ],
+  "threat_intel": {
+    "model": "llama-3.3-70b-versatile",
+    "error": null,
+    "threat_summary": {
+      "threat_name": "Macro-delivered downloader with HTTP payload delivery",
+      "threat_actor_type": "Cybercrime",
+      "attack_vector": "Spearphishing attachment with malicious VBA macro",
+      "attack_chain": [
+        "Step 1: Victim opens invoice.docm and enables macros",
+        "Step 2: AutoOpen executes PowerShell to download payload.exe",
+        "Step 3: Downloaded payload executes from %TEMP%"
+      ],
+      "iocs": {
+        "hashes": [],
+        "ips": ["203.0.113.10"],
+        "domains": ["recongraph.xyz"],
+        "urls": ["http://recongraph.xyz/payload.exe"],
+        "file_names": ["payload.exe", "update.exe"]
+      },
+      "mitre_ttps": [
+        {"id": "T1566.001", "name": "Spearphishing Attachment", "tactic": "Initial Access"},
+        {"id": "T1059.001", "name": "PowerShell", "tactic": "Execution"}
+      ],
+      "severity": "Critical",
+      "confidence": "High",
+      "reasoning": "The document contains an AutoOpen macro that launches a hidden PowerShell downloader for a remote executable. ThreatFox independently associates the domain with MintsLoader. Confidence is high because the IOC is corroborated by two independent sources."
+    },
+    "yara": {
+      "reasoning": "Rules were derived from the observed VBA auto-exec entry point and the embedded URL string.",
+      "total_rules": 1,
+      "rules": [
+        {
+          "rule_name": "SecFlow_Malware_EmbeddedString",
+          "description": "Detects the observed payload delivery URL inside Office documents",
+          "reasoning": "The string http://recongraph.xyz/payload.exe was found in the olevba IOC output.",
+          "tags": ["malware", "office", "downloader"],
+          "rule_text": "rule SecFlow_Malware_EmbeddedString {\n  meta:\n    description = \"Detects observed payload URL\"\n    author = \"SecFlow AI\"\n    date = \"2026-01-01\"\n    severity = \"high\"\n    reference = \"SecFlow automated analysis\"\n  strings:\n    $s1 = \"http://recongraph.xyz/payload.exe\"\n  condition:\n    any of them\n}"
+        }
+      ]
+    },
+    "sigma": {
+      "reasoning": "Rules cover process creation for the PowerShell downloader and DNS lookups for the C2 domain.",
+      "total_rules": 1,
+      "rules": [
+        {
+          "rule_name": "detect_powershell_download",
+          "description": "Detects PowerShell downloading a remote executable",
+          "log_source": "Windows Security",
+          "reasoning": "AutoOpen macro launched powershell with iwr against the observed URL.",
+          "rule_text": "title: Detect PowerShell Download\nid: 11111111-1111-4111-8111-111111111111\nstatus: experimental\ndescription: Detects PowerShell downloading a remote executable\nauthor: SecFlow AI\ndate: 2026/01/01\nmodified: 2026/01/01\ntags:\n  - attack.execution\n  - attack.t1059.001\nlogsource:\n  category: process_creation\n  product: windows\ndetection:\n  selection:\n    CommandLine|contains:\n      - 'iwr http://recongraph.xyz/payload.exe'\n  condition: selection\nfalsepositives:\n  - Legitimate administrative scripts\nlevel: high"
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "_note": "Redacted fixture of POST {RECON_ANALYZER_URL}/footprint for an email query.",
+  "query": "analyst@example.org",
+  "type": "email",
+  "email_scan": {
+    "exposed": true,
+    "breach_count": 12,
+    "breaches": [
+      {
+        "breach": "ExampleForum2019",
+        "domain": "forum.example.org",
+        "breach_date": "2019-04-01",
+        "added_date": "2019-05-12",
+        "pwn_count": 1250000,
+        "description": "Example forum suffered a data breach.",
+        "data_classes": ["Email addresses", "Passwords", "IP addresses"]
+      },
+      {
+        "breach": "CloudBackup2021",
+        "domain": "backup.example.com",
+        "breach_date": "2021-08-17",
+        "added_date": "2021-09-02",
+        "pwn_count": 830000,
+        "description": "Cloud backup service exposure.",
+        "data_classes": ["Email addresses", "Names", "Passwords"]
+      }
+    ],
+    "password_strength": [
+      {"password": "P@ssw0rd123", "strength": "weak"}
+    ],
+    "risk": [
+      {"risk_label": "Critical", "risk_score": 100}
+    ]
+  }
+}

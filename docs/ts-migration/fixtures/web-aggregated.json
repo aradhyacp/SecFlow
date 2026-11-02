@@ -1,0 +1,63 @@
+{
+  "_note": "Redacted fixture of the aggregated GET responses the orchestrator collects from {WEB_ANALYZER_URL}/<route>?url=... The orchestrator requests 12 of the 34 routes; missing keys mean the route failed or returned non-200.",
+  "status": {
+    "isUp": true,
+    "responseCode": 200,
+    "responseTime": 412
+  },
+  "security_headers": {
+    "score": 12.5,
+    "present": ["Server"],
+    "missing": [
+      "X-Content-Type-Options",
+      "X-Frame-Options",
+      "X-XSS-Protection",
+      "Content-Security-Policy",
+      "Referrer-Policy",
+      "Permissions-Policy",
+      "Expect-CT"
+    ]
+  },
+  "tls": {
+    "tlsVersion": "TLSv1.3",
+    "cipher": {"bits": 128, "name": "TLS_AES_128_GCM_SHA256", "protocol": "TLSv1.3"}
+  },
+  "ssl": {
+    "success": true,
+    "subject": {"CN": "recongraph.xyz"},
+    "issuer": {"C": "US", "O": "Let's Encrypt", "CN": "R3"},
+    "notAfter": "2026-06-01T12:00:00.000Z"
+  },
+  "hsts": {
+    "present": false
+  },
+  "firewall": {
+    "hasWaf": false,
+    "waf": ""
+  },
+  "redirects": {
+    "redirects": []
+  },
+  "headers": {
+    "server": "nginx"
+  },
+  "redirect_chain": {
+    "total_hops": 0,
+    "is_safe": true,
+    "risk_assessment": {"risk_level": "low"}
+  },
+  "malware_check": {
+    "is_malicious": false,
+    "risk_level": "low",
+    "detections": [],
+    "detection_count": 0
+  },
+  "url_parse": {
+    "is_valid": true,
+    "suspicious_indicators": [],
+    "risk_level": "low"
+  },
+  "dns": {
+    "a": ["203.0.113.10"]
+  }
+}

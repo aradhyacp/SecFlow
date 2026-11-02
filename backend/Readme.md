@@ -1,6 +1,10 @@
 # SecFlow — Backend
 
-The backend is a **six-container Docker Compose application**: one Orchestrator service that runs the AI pipeline loop and five independent analyzer microservices.
+The backend is a **six-core-service Docker Compose application**: one
+TypeScript/LangGraph.js orchestrator and five independent Python analyzer
+microservices (plus the Steg analyzer's PostgreSQL, Redis, and worker
+containers). The analyzers keep their own HTTP APIs; the orchestrator calls them
+over the shared Docker network.
 
 ---
 
@@ -8,15 +12,15 @@ The backend is a **six-container Docker Compose application**: one Orchestrator 
 
 | Service | Source directory | Host port | Container port | Public API |
 |---|---|---|---|---|
-| Orchestrator | `orchestrator/` | 5000 | 5000 | `POST /api/smart-analyze` |
+| Orchestrator | `orchestrator-ts/` | 5000 | 5000 | `POST /api/smart-analyze` |
 | Malware Analyzer | `Malware-Analyzer/` | 5001 | 5000 | `POST /api/malware-analyzer/decompile` + `/file-analysis` |
 | Steg Analyzer | `Steg-Analyzer/` | 5002 | 5000 | `POST /api/steg-analyzer/upload` |
 | Recon Analyzer | `Recon-Analyzer/` | 5003 | 5000 | `POST /api/Recon-Analyzer/scan` + `/footprint` |
 | Web Analyzer | `Web-Analyzer/` | 5005 | 5000 | `POST /api/web-analyzer/` |
 | Macro Analyzer | `macro-analyzer/` | 5006 | 5000 | `POST /api/macro-analyzer/analyze` |
 
-> All containers listen on port **5000 internally**. Host ports differ.  
-> There is no `url-analyzer` service \u2014 that was a placeholder that was never built.
+> All containers listen on port **5000 internally**. Host ports differ.
+> There is no `url-analyzer` service — that was a placeholder that was never built.
 
 ---
 
@@ -25,29 +29,27 @@ The backend is a **six-container Docker Compose application**: one Orchestrator 
 ```
 backend/
 │
-├── orchestrator/                        ← Pipeline orchestrator (port 5000)
-│   ├── app/
-│   │   ├── __init__.py
-│   │   ├── routes.py                    ← Flask: POST /api/smart-analyze
-│   │   ├── orchestrator.py              ← Pipeline loop + download-and-analyze
-│   │   ├── classifier/
-│   │   │   ├── classifier.py            ← file + python-magic detection
-│   │   │   └── rules.py                 ← Deterministic routing rules
-│   │   ├── ai/
-│   │   │   ├── engine.py                ← Groq qwen/qwen3-32b wrapper
-│   │   │   └── keywords.txt             ← Fallback grep keyword list
-│   │   ├── adapters/                    ← Normalize analyzer responses → SecFlow contract
-│   │   │   ├── malware_adapter.py
-│   │   │   ├── steg_adapter.py
-│   │   │   ├── recon_adapter.py
-│   │   │   ├── web_adapter.py
-│   │   │   └── macro_adapter.py
-│   │   ├── store/
-│   │   │   └── findings_store.py
-│   │   └── reporter/
-│   │       └── report_generator.py      ← PWNDoc HTML + Export PDF button
+├── orchestrator-ts/                     ← TypeScript + LangGraph orchestrator (port 5000)
+│   ├── src/
+│   │   ├── index.ts                     ← Express bootstrap + graceful shutdown
+│   │   ├── app.ts                       ← App factory (CORS, logging, routes)
+│   │   ├── config.ts                    ← Zod-validated environment
+│   │   ├── routes/
+│   │   │   ├── analyze.ts               ← POST /api/smart-analyze
+│   │   │   ├── health.ts                ← GET /api/health + /api/ready
+│   │   │   └── reports.ts               ← GET /api/report/:jobId/:fmt
+│   │   ├── classifier/                  ← Deterministic classification + rules
+│   │   ├── graph/                       ← LangGraph state, decisions, loop, finalization
+│   │   ├── analyzers/                   ← HTTP clients, adapters, validated tools
+│   │   ├── pipeline/                    ← Runner, uploads, payload downloader
+│   │   ├── security/                    ← SSRF/network guard
+│   │   ├── rules/                       ← YARA-X + SIGMA generation and validation
+│   │   ├── report/                      ← PWNDoc JSON/HTML builder + narrative
+│   │   ├── prompts/                     ← Centralized evidence-isolated prompts
+│   │   └── model/                       ← OpenRouter provider + model adapter
+│   ├── tests/                           ← Unit, contract, parity, live-gated tests
 │   ├── Dockerfile
-│   └── requirements.txt
+│   └── package.json
 │
 ├── Malware-Analyzer/                    ← Ghidra + objdump + VirusTotal (port 5001)
 ├── Steg-Analyzer/                       ← binwalk + zsteg + steghide (port 5002)
@@ -61,7 +63,7 @@ backend/
 │   ├── Dockerfile
 │   └── requirements.txt
 │
-└── compose.yml                          ← All 6 services on secflow-net
+└── compose.yml                          ← All services on secflow-net
 ```
 
 ---
@@ -73,7 +75,8 @@ cd backend
 
 # 1. Copy env file
 cp .env.example .env
-# Fill in GROQ_API_KEY (required), VIRUSTOTAL_API_KEY (optional)
+# Fill in OPENROUTER_API_KEY (required) and VIRUSTOTAL_API_KEY (recommended)
+# See .env.example for all model, timeout, and security settings.
 
 # 2. Build and start all services
 docker compose up --build
@@ -93,7 +96,22 @@ curl -X POST "http://localhost:5000/api/smart-analyze?passes=3" \
   -d '{"target": "https://example.com/login"}'
 ```
 
-The response includes a `report_path` field pointing to the generated HTML report.
+The response contains `job_id`, `passes_completed`, `overall_risk_score`,
+`findings_summary`, `report_paths`, and `report_urls`. Reports are also served at
+`GET /api/report/<job_id>/html` and `/json`.
+
+### Local orchestrator development (without rebuilding the container)
+
+```bash
+cd backend/orchestrator-ts
+npm ci
+export OPENROUTER_API_KEY=...
+export ALLOW_PRIVATE_TARGETS=false
+npm run dev
+```
+
+Analyzer URLs default to the Docker-internal hostnames. Override
+`ANALYZER_*_URL` when running the orchestrator directly on the host.
 
 ---
 
@@ -136,89 +154,153 @@ curl -X POST http://localhost:5006/api/macro-analyzer/analyze \
 
 ## How the Pipeline Works
 
-1. `POST /api/smart-analyze` received by the Orchestrator.
-2. **Classifier** identifies input type via `file` + `python-magic` and applies deterministic routing rules. Unknown types send the first 100 lines + magic output to Groq AI for classification.
-3. For each pass, the **Orchestrator** calls the selected analyzer via HTTP to its Docker-internal URL. All service names resolve on `secflow-net`.
-4. The analyzer response is passed through the matching **adapter** (`malware_adapter.py` etc.), which normalises it to the SecFlow contract dict.
-5. The normalised result is appended to the **Findings Store**.
-6. The **AI Decision Engine** (`engine.py`) extracts concrete IOCs (URLs, IPs, domains) from the full `raw_output` via regex, builds a focused context, and queries Groq `qwen/qwen3-32b` to get `{"next_tool", "target", "reasoning"}`. A rule-based fallback handles Groq failures.
-7. If AI returns `next_tool: null` but passes remain, the orchestrator looks for HTTP URLs in `raw_output` → streams downloads (≤50 MB) → routes the payload to the matching analyzer. A `payload_downloaded` finding is always prepended to flag provenance.
-8. Loop runs until max passes, early termination by AI, or no downloadable payloads remain.
-9. **Report Generator** calls Groq once more for an executive summary, then renders a self-contained PWNDoc HTML report with a one-click **Export PDF** button (browser print-to-PDF).
+1. `POST /api/smart-analyze` is received by the orchestrator. `passes` accepts
+   `3`, `4`, or `5` and defaults to `3`.
+2. The **classifier** identifies the input from magic bytes, file extension, and
+   string rules (image → steg, Office/RTF → macro, executable → malware,
+   URL → web, IP/domain/email/phone → recon). Unknown inputs go to the model
+   with a bounded, untrusted-context file preview.
+3. A **LangGraph state graph** runs the analysis loop. After each analyzer pass
+   the model receives the current findings/evidence and decides the next
+   analyzer tool or finishes. All analyzer tools are validated
+   `{ targetId }` calls into a trusted per-run target catalog.
+4. Analyzer HTTP responses pass through the matching adapter, which normalises
+   them to the SecFlow contract. Results are accumulated in graph state and the
+   raw-output store (the model sees bounded evidence, never unbounded dumps).
+5. When the model finishes, the orchestrator opportunistically downloads HTTP
+   URLs found in evidence through an SSRF-guarded downloader (50 MiB cap,
+   per-redirect checks) and routes the payload to a matching analyzer with a
+   `payload_downloaded` provenance finding.
+6. The loop stops at the requested pass count, model termination, the
+   `MODEL_MAX_CYCLES`/`MODEL_MAX_TOOL_CALLS` budgets, or the overall deadline.
+7. **YARA-X** compiles generated YARA rules and **SIGMA** rules are structurally
+   validated. The **report stage** renders a self-contained PWNDoc HTML report
+   plus JSON. Optional narrative text is generated by the same OpenRouter model.
+
+### Failure behavior
+
+- Analyzer failures are recorded as tool errors/structured findings; the run
+  continues when other evidence exists.
+- If the whole run produces no findings, the API returns `500` rather than
+  fabricating a result.
+- Missing `OPENROUTER_API_KEY` returns `503`; an overall timeout returns `504`;
+  blocked SSRF targets return `400`.
 
 ---
 
-## AI Model — Groq `qwen/qwen3-32b`
+## AI Model — OpenRouter
 
-The AI Decision Engine uses **Groq API** with model `qwen/qwen3-32b` via the OpenAI-compatible interface (`base_url="https://api.groq.com/openai/v1"`).
+The orchestrator uses **OpenRouter** through the Vercel AI SDK
+(`@openrouter/ai-sdk-provider` + `ai`) and runs decisions as a single
+LangGraph.js state machine.
 
-The system message is set to `/no_think` — a Qwen3 feature that disables chain-of-thought reasoning for faster, direct responses. This is important for routing decisions that happen on every pipeline pass.
+- Default model: `nvidia/nemotron-3-ultra-550b-a55b:free`
+- Override with `OPENROUTER_MODEL`
+- Per-call limit: `MODEL_MAX_TOKENS` (default `2048`)
+- Per-run decision budget: `MODEL_MAX_CYCLES` (default `12`)
+- Request timeout: `MODEL_TIMEOUT_MS` (default `60000`)
 
-The engine does **not** use OpenAI function-calling / tool schemas. Instead it instructs the model via the prompt to return a plain JSON object:
-```json
-{"next_tool": "malware" | "steg" | "recon" | "web" | "macro" | null, "target": "...", "reasoning": "..."}
-```
-
-A regex/rule-based fallback activates if the model returns non-JSON or an empty response.
+Tool calls are schema-validated with Zod. Model output cannot choose arbitrary
+URLs, commands, or files; analyzer tools accept only target ids already present
+in the run's target catalog.
 
 ---
 
 ## SecFlow Findings Contract
 
-Every adapter must produce:
+Every adapter produces:
 
-```python
+```ts
 {
-    "analyzer":   str,         # "malware" | "steg" | "recon" | "web" | "macro"
-    "pass":       int,         # 1-indexed loop pass number
-    "input":      str,         # what was sent to the analyzer
-    "findings":   list[dict],  # list of finding objects
-    "risk_score": float,       # 0.0 – 10.0
-    "raw_output": str,         # full text output (AI reads this for IOC extraction)
+  analyzer: "malware" | "steg" | "recon" | "web" | "macro",
+  pass: number,              // 1-indexed loop pass number
+  input: string,             // what was sent to the analyzer
+  findings: Finding[],
+  risk_score: number,        // 0.0 – 10.0
+  raw_output: string,        // analyzer text retained for evidence/reporting
 }
 ```
 
-Each `finding` object:
-```python
+Each finding:
+
+```ts
 {
-    "type":     str,   # e.g. "malware_detection", "macro_malicious", "av_detection" …
-    "detail":   str,   # human-readable description
-    "severity": str,   # "info" | "low" | "medium" | "high" | "critical"
-    "evidence": str,   # raw evidence — rendered intelligently in HTML report
+  type: string,              // e.g. "malware_detection", "macro_malicious", "av_detection"
+  detail: string,            // human-readable description
+  severity: "info" | "low" | "medium" | "high" | "critical",
+  evidence?: string,         // raw evidence rendered in the HTML report
+  extracted_path?: string | null,
 }
 ```
 
 ---
 
-## Required Environment Variables
+## Environment Variables
 
-```
+```env
 # backend/.env (copy from .env.example)
 
-GROQ_API_KEY=             # Required — AI routing + report summary
-VIRUSTOTAL_API_KEY=       # Optional — Malware Analyzer + Macro Analyzer VT lookups
-GEMINI_API_KEY=           # Optional — Malware Analyzer AI summary/diagram endpoints only
+OPENROUTER_API_KEY=        # Required — routing, rule generation, report narrative
+OPENROUTER_MODEL=nvidia/nemotron-3-ultra-550b-a55b:free
+VIRUSTOTAL_API_KEY=        # Recommended — Malware + Macro VT lookups
+GEMINI_API_KEY=            # Optional — analyzer-only AI summary/diagram endpoints
+
+# Orchestrator limits
+MODEL_MAX_CYCLES=12
+MODEL_MAX_TOKENS=2048
+MODEL_TIMEOUT_MS=60000
+ANALYZER_TIMEOUT_MS=60000
+TOTAL_ANALYSIS_TIMEOUT_MS=600000
+MAX_UPLOAD_BYTES=52428800
+ALLOW_PRIVATE_TARGETS=false
+LOG_LEVEL=info
 
 # Recon
-NUMVERIFY_API_KEY=        # Optional — phone number validation
-THREATFOX_API_KEY=        # Optional — higher ThreatFox rate limit
-ipAPI_KEY=                # Optional — ip-api.com Pro
+NUMVERIFY_API_KEY=         # Optional — phone number validation
+THREATFOX_API_KEY=         # Optional — higher ThreatFox rate limit
+ipAPI_KEY=                 # Optional — ip-api.com Pro
 
 # Steg DB
-STEG_POSTGRES_PASSWORD=   # Default: secflowpass
-
-# Loop size (default 3, max 5)
-MAX_PASSES=3
+STEG_POSTGRES_PASSWORD=    # Default: secflowpass
 ```
+
+`ALLOW_PRIVATE_TARGETS=true` is only for local demos/tests. It permits
+loopback/private destinations while still requiring HTTP(S) without embedded
+credentials. Keep it `false` in production.
+
+---
+
+## Testing
+
+```bash
+cd backend/orchestrator-ts
+
+npm run typecheck
+npm run lint
+npm test
+npm run build
+
+# Python-vs-TypeScript parity replay (requires the Python baseline checkout)
+SECFLOW_PARITY=1 npx vitest run tests/parity/parity.test.ts
+```
+
+Live OpenRouter and analyzer tests are gated by `OPENROUTER_API_KEY` and
+`SECFLOW_LIVE_ANALYZERS=1`.
 
 ---
 
 ## Developer Notes
 
-- **Never modify analyzer service code** to match the SecFlow contract. Write the adapter instead.
-- **Never import analyzer code** into the orchestrator. All analyzer calls are `requests.post()` over HTTP.
-- The `Recon-Analyzer` request body key is `"query"`, not `"target"`.  
+- **Never modify analyzer service code** to match the SecFlow contract. Update
+  the TypeScript adapter in `orchestrator-ts/src/analyzers/adapters/` instead.
+- **Never import analyzer code** into the orchestrator. All analyzer calls are
+  HTTP requests to their service URLs.
+- The `Recon-Analyzer` request body key is `"query"`, not `"target"`.
 - The `Recon-Analyzer` API prefix is `/api/Recon-Analyzer` (capital R and A).
-- The `Malware-Analyzer` Dockerfile requires `eclipse-temurin:21-jdk-jammy` as base image (Ghidra needs JDK 21).
+- The `Malware-Analyzer` Dockerfile requires `eclipse-temurin:21-jdk-jammy` as
+  base image (Ghidra needs JDK 21).
+- Reports are written under `REPORTS_DIR/<16-hex job id>/`; uploads and
+  downloaded payloads are removed after the run.
 - See [AGENTS.md](../AGENTS.md) for full per-service specs and coding conventions.
-- See [docs/](../docs/) for architecture, pipeline flow, and analyzer docs.
+- See [docs/](../docs/) for architecture, pipeline flow, analyzer docs, and the
+  TypeScript migration record.
