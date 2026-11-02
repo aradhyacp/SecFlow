@@ -33,6 +33,11 @@ beforeAll(async () => {
         response.setHeader("content-type", "application/json");
         response.end("{not json");
         return;
+      case "/large":
+        response.statusCode = 200;
+        response.setHeader("content-type", "application/json");
+        response.end(JSON.stringify({ value: "x".repeat(8_192) }));
+        return;
       case "/network-failure":
         response.destroy();
         return;
@@ -91,6 +96,20 @@ describe("requestJson", () => {
     expect(server.requests.length).toBe(before + 1);
   });
 
+  it("rejects a response body that exceeds the configured cap", async () => {
+    const before = server.requests.length;
+    const error = await requestJson(`${server.baseUrl}/large`, {
+      label: "test",
+      timeoutMs: 1_000,
+      maxResponseBytes: 128,
+    }).catch((cause: unknown) => cause);
+
+    expect(error).toBeInstanceOf(AnalyzerHttpError);
+    expect(error).toMatchObject({ retriable: false });
+    expect((error as AnalyzerHttpError).message).toContain("exceeded 128 bytes");
+    expect(server.requests.length).toBe(before + 1);
+  });
+
   it("does not retry invalid JSON", async () => {
     const before = server.requests.length;
     const error = await requestJson(`${server.baseUrl}/invalid-json`, {
@@ -129,7 +148,10 @@ describe("requestJson", () => {
       retryDelayMs: 1,
       signal: controller.signal,
     });
-    setTimeout(() => controller.abort(), 20);
+    for (let attempt = 0; attempt < 100 && server.requests.length === before; attempt += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 2));
+    }
+    controller.abort();
 
     await expect(pending).rejects.toMatchObject({ name: "AbortError" });
     expect(server.requests.length).toBe(before + 1);

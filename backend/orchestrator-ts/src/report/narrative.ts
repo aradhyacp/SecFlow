@@ -117,7 +117,9 @@ export async function enhanceReportNarrative(
       prompt: buildReportPrompt({ evidence: evidenceForReport(state, report) }),
       schema: reportNarrativeSchema,
       temperature: 0.1,
-      maxOutputTokens: 1_200,
+      // Leave room for reasoning tokens before the JSON narrative.
+      maxOutputTokens: 2_048,
+      runId: state.runId,
       ...(options.signal ? { abortSignal: options.signal } : {}),
     });
     return reportNarrativeSchema.parse(result);

@@ -107,6 +107,11 @@ export class ToolRegistry {
     return [...this.tools.keys()];
   }
 
+  /** Registered tools in insertion order, for composing registries. */
+  all(): RegisteredTool[] {
+    return [...this.tools.values()];
+  }
+
   get(name: string): RegisteredTool | undefined {
     return this.tools.get(name);
   }

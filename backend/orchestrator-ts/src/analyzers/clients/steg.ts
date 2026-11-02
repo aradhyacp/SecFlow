@@ -14,6 +14,7 @@ export interface StegClientOptions {
   pollIntervalMs?: number;
   pollTimeoutMs?: number;
   maxRetries?: number;
+  maxResponseBytes?: number;
   logger?: Logger;
 }
 
@@ -25,6 +26,7 @@ export class StegAnalyzerClient {
   private readonly pollIntervalMs: number;
   private readonly pollTimeoutMs: number;
   private readonly maxRetries: number;
+  private readonly maxResponseBytes: number | undefined;
   private readonly logger: Logger | undefined;
 
   constructor(options: StegClientOptions) {
@@ -35,6 +37,7 @@ export class StegAnalyzerClient {
     this.pollIntervalMs = options.pollIntervalMs ?? 3_000;
     this.pollTimeoutMs = options.pollTimeoutMs ?? 300_000;
     this.maxRetries = options.maxRetries ?? 0;
+    this.maxResponseBytes = options.maxResponseBytes;
     this.logger = options.logger;
   }
 
@@ -54,6 +57,7 @@ export class StegAnalyzerClient {
         label: "steg-analyzer result",
         timeoutMs: this.resultTimeoutMs,
         maxRetries: this.maxRetries,
+        ...(this.maxResponseBytes !== undefined ? { maxResponseBytes: this.maxResponseBytes } : {}),
         ...(signal ? { signal } : {}),
         ...(this.logger ? { logger: this.logger } : {}),
       });
@@ -73,6 +77,7 @@ export class StegAnalyzerClient {
         body: form,
         timeoutMs: this.uploadTimeoutMs,
         maxRetries: this.maxRetries,
+        ...(this.maxResponseBytes !== undefined ? { maxResponseBytes: this.maxResponseBytes } : {}),
         ...(signal ? { signal } : {}),
         ...(this.logger ? { logger: this.logger } : {}),
       });
@@ -99,6 +104,9 @@ export class StegAnalyzerClient {
           label: "steg-analyzer status",
           timeoutMs: this.statusTimeoutMs,
           maxRetries: this.maxRetries,
+          ...(this.maxResponseBytes !== undefined
+            ? { maxResponseBytes: this.maxResponseBytes }
+            : {}),
           ...(signal ? { signal } : {}),
           ...(this.logger ? { logger: this.logger } : {}),
         });

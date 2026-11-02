@@ -9,6 +9,7 @@ import {
 import { targetRefSchema, type AnalysisToolName, type TargetRef } from "../graph/schema/tools.js";
 import { defineTool, ToolRegistry, type ToolContext } from "../graph/tools.js";
 import type { AnalysisTarget, TargetKind } from "../graph/state.js";
+import { createNetworkGuard, type NetworkGuard } from "../security/networkGuard.js";
 import { truncate } from "./parse.js";
 import type { AdaptedAnalyzerResult } from "./types.js";
 import type { AnalyzerToolResult } from "./schema.js";
@@ -43,6 +44,8 @@ export interface AnalyzerToolDependencies {
   name: AnalysisToolName;
   analyzer: AnalyzerName;
   run(target: AnalysisTarget, context: ToolContext): Promise<AdaptedAnalyzerResult>;
+  /** SSRF policy applied before the analyzer receives a network target. */
+  guard?: NetworkGuard;
 }
 
 function conciseFindings(findings: readonly SecFlowFinding[]): SecFlowFinding[] {
@@ -79,9 +82,11 @@ export function createAnalyzerTool(deps: AnalyzerToolDependencies) {
       const allowedKinds = ALLOWED_TARGET_KINDS[deps.name];
       if (!allowedKinds.includes(target.kind)) {
         throw new Error(
-          `${deps.name} cannot analyze target kind "${target.kind}" (${target.displayName}); expected ${allowedKinds.join(" or ")}.`,
+          `${deps.name} cannot analyze target kind "${target.kind}" (${target.id}); expected ${allowedKinds.join(" or ")}.`,
         );
       }
+
+      await deps.guard?.assertTargetAllowed(target);
 
       const adapted = await deps.run(target, context);
       const secFlow = secFlowResultSchema.parse({
@@ -131,12 +136,21 @@ export function createAnalyzerTool(deps: AnalyzerToolDependencies) {
  * shared per run; tool execution supplies the target catalog, pass number and
  * raw-output store through `ToolContext`.
  */
-export function createAnalyzerToolRegistry(config: AppConfig, logger: Logger): ToolRegistry {
+export function createAnalyzerToolRegistry(
+  config: AppConfig,
+  logger: Logger,
+  options: { guard?: NetworkGuard } = {},
+): ToolRegistry {
+  const guard =
+    options.guard ?? createNetworkGuard({ allowPrivateTargets: config.allowPrivateTargets });
+  const maxResponseBytes = config.analyzerMaxResponseBytes;
+
   const malware = new MalwareAnalyzerClient({
     baseUrl: config.analyzers.malware.baseUrl,
     fileAnalysisTimeoutMs: config.analyzers.malware.timeoutOverrideMs ?? 60_000,
     decompileTimeoutMs: config.analyzers.malware.timeoutOverrideMs ?? 180_000,
     maxRetries: 0,
+    maxResponseBytes,
     logger,
   });
 
@@ -146,6 +160,7 @@ export function createAnalyzerToolRegistry(config: AppConfig, logger: Logger): T
     statusTimeoutMs: config.analyzers.steg.timeoutOverrideMs ?? 10_000,
     resultTimeoutMs: config.analyzers.steg.timeoutOverrideMs ?? 30_000,
     maxRetries: 0,
+    maxResponseBytes,
     logger,
   });
 
@@ -153,6 +168,7 @@ export function createAnalyzerToolRegistry(config: AppConfig, logger: Logger): T
     baseUrl: config.analyzers.recon.baseUrl,
     timeoutMs: config.analyzers.recon.timeoutMs,
     maxRetries: config.analyzerMaxRetries,
+    maxResponseBytes,
     logger,
   });
 
@@ -162,6 +178,7 @@ export function createAnalyzerToolRegistry(config: AppConfig, logger: Logger): T
       ? { timeoutOverrideMs: config.analyzers.web.timeoutOverrideMs }
       : {}),
     maxRetries: config.analyzerMaxRetries,
+    maxResponseBytes,
     logger,
   });
 
@@ -169,6 +186,7 @@ export function createAnalyzerToolRegistry(config: AppConfig, logger: Logger): T
     baseUrl: config.analyzers.macro.baseUrl,
     timeoutMs: config.analyzers.macro.timeoutMs,
     maxRetries: 0,
+    maxResponseBytes,
     logger,
   });
 
@@ -176,26 +194,31 @@ export function createAnalyzerToolRegistry(config: AppConfig, logger: Logger): T
     createAnalyzerTool({
       name: "analyze_malware",
       analyzer: "malware",
+      guard,
       run: (target, context) => malware.analyze(target.value, context.signal),
     }),
     createAnalyzerTool({
       name: "analyze_steg",
       analyzer: "steg",
+      guard,
       run: (target, context) => steg.analyze(target.value, context.signal),
     }),
     createAnalyzerTool({
       name: "analyze_recon",
       analyzer: "recon",
+      guard,
       run: (target, context) => recon.analyze(target.value, target.displayName, context.signal),
     }),
     createAnalyzerTool({
       name: "analyze_web",
       analyzer: "web",
+      guard,
       run: (target, context) => web.analyze(target.value, target.displayName, context.signal),
     }),
     createAnalyzerTool({
       name: "analyze_macro",
       analyzer: "macro",
+      guard,
       run: (target, context) => macro.analyze(target.value, target.displayName, context.signal),
     }),
   ]);

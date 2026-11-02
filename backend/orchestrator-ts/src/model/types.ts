@@ -26,6 +26,8 @@ export interface ModelDecisionRequest {
   tools?: ToolSet;
   temperature?: number;
   maxOutputTokens?: number;
+  /** Correlation id for structured logs; never sent to the provider as content. */
+  runId?: string;
   abortSignal?: AbortSignal;
 }
 
@@ -35,6 +37,8 @@ export interface StructuredObjectRequest<T> {
   schema: z.ZodType<T>;
   temperature?: number;
   maxOutputTokens?: number;
+  /** Correlation id for structured logs; never sent to the provider as content. */
+  runId?: string;
   abortSignal?: AbortSignal;
 }
 

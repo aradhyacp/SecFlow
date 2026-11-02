@@ -13,6 +13,7 @@ describe("loadConfig", () => {
     expect(config.model.timeoutMs).toBe(60_000);
     expect(config.analyzerTimeoutMs).toBe(60_000);
     expect(config.analyzerMaxRetries).toBe(1);
+    expect(config.analyzerMaxResponseBytes).toBe(25 * 1024 * 1024);
     expect(config.totalAnalysisTimeoutMs).toBe(600_000);
     expect(config.analyzers.malware.timeoutOverrideMs).toBeUndefined();
     expect(config.maxUploadBytes).toBe(50 * 1024 * 1024);
@@ -43,6 +44,19 @@ describe("loadConfig", () => {
     expect(config.analyzers.web.timeoutOverrideMs).toBeUndefined();
   });
 
+  it("bounds the analyzer response-size cap", () => {
+    expect(
+      loadConfig({ NODE_ENV: "test", ANALYZER_MAX_RESPONSE_BYTES: "1024" })
+        .analyzerMaxResponseBytes,
+    ).toBe(1024);
+    expect(() => loadConfig({ NODE_ENV: "test", ANALYZER_MAX_RESPONSE_BYTES: "0" })).toThrow(
+      ConfigError,
+    );
+    expect(() =>
+      loadConfig({ NODE_ENV: "test", ANALYZER_MAX_RESPONSE_BYTES: "104857601" }),
+    ).toThrow(ConfigError);
+  });
+
   it("bounds the analyzer retry budget", () => {
     expect(loadConfig({ NODE_ENV: "test", ANALYZER_MAX_RETRIES: "0" }).analyzerMaxRetries).toBe(0);
     expect(loadConfig({ NODE_ENV: "test", ANALYZER_MAX_RETRIES: "3" }).analyzerMaxRetries).toBe(3);
@@ -50,10 +64,19 @@ describe("loadConfig", () => {
     expect(() => loadConfig({ NODE_ENV: "test", ANALYZER_MAX_RETRIES: "-1" })).toThrow(ConfigError);
   });
 
-  it("rejects malformed analyzer URLs", () => {
+  it("rejects malformed or unsafe analyzer URLs", () => {
     expect(() => loadConfig({ NODE_ENV: "test", ANALYZER_WEB_URL: "not-a-url" })).toThrow(
       ConfigError,
     );
+    expect(() => loadConfig({ NODE_ENV: "test", ANALYZER_WEB_URL: "ftp://web-analyzer/" })).toThrow(
+      ConfigError,
+    );
+    expect(() =>
+      loadConfig({
+        NODE_ENV: "test",
+        ANALYZER_WEB_URL: "http://user:password@web-analyzer:5000/",
+      }),
+    ).toThrow(ConfigError);
   });
 
   it("requires OPENROUTER_API_KEY in production", () => {

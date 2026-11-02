@@ -51,6 +51,7 @@ describe("analysis decision loop", () => {
     expect(calls.map((call) => call.tool)).toEqual(["analyze_recon"]);
     expect(calls[0]?.pass).toBe(1);
     expect(model.requests).toHaveLength(1);
+    expect(model.requests[0]?.maxOutputTokens).toBeGreaterThanOrEqual(2_048);
     expect(result.state.findings).toHaveLength(1);
     expect(result.state.findings[0]).toMatchObject({
       analyzer: "recon",

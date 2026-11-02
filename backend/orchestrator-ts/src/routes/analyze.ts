@@ -4,9 +4,10 @@ import { Router } from "express";
 import type { Multer } from "multer";
 
 import type { AppConfig } from "../config.js";
-import { HttpError, NotImplementedError } from "../http/errors.js";
+import { HttpError } from "../http/errors.js";
 import { resolveInput } from "../pipeline/resolveInput.js";
 import type { AnalysisRunner, PassCount } from "../pipeline/types.js";
+import { SsrfBlockedError } from "../security/networkGuard.js";
 
 export interface AnalyzeDependencies {
   config: AppConfig;
@@ -40,7 +41,10 @@ export function createAnalyzeRouter({ config, runner, upload }: AnalyzeDependenc
     const passes = parsePasses(req.query.passes);
     const input = await resolveInput(req, config);
     const headerId = req.headers["x-request-id"];
-    const runId = typeof headerId === "string" && headerId.length > 0 ? headerId : randomUUID();
+    const runId =
+      typeof headerId === "string" && headerId.trim().length > 0 && headerId.length <= 200
+        ? headerId
+        : randomUUID();
 
     try {
       const result = await runner.run({
@@ -60,8 +64,8 @@ export function createAnalyzeRouter({ config, runner, upload }: AnalyzeDependenc
         report_urls: result.reportUrls,
       });
     } catch (error) {
-      if (error instanceof NotImplementedError) {
-        throw error;
+      if (error instanceof SsrfBlockedError) {
+        throw new HttpError(400, error.message);
       }
       if (error instanceof Error && error.name === "TimeoutError") {
         throw new HttpError(504, "Analysis exceeded TOTAL_ANALYSIS_TIMEOUT_MS");

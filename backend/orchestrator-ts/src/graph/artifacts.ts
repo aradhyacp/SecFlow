@@ -1,6 +1,7 @@
 import { makeIndicatorId, makeTargetId } from "./ids.js";
 import type { Indicator, AnalysisTarget } from "./state.js";
 import type { SecFlowResult } from "./schema/analyzer.js";
+import { isObviouslyProhibitedTarget } from "../security/networkGuard.js";
 
 const MAX_ARTIFACT_TEXT = 1_000_000;
 const MAX_NEW_TARGETS = 20;
@@ -162,6 +163,10 @@ export function buildArtifactTargets(
 
   const add = (kind: "url" | "ip" | "domain", value: string): void => {
     if (value.length === 0 || value.length > 4_096) {
+      return;
+    }
+    // Fast, DNS-free filter. Hostname resolution is checked again at execution.
+    if (isObviouslyProhibitedTarget(kind, value)) {
       return;
     }
     const targetId = makeTargetId(kind, value);

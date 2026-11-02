@@ -31,6 +31,7 @@ export interface WebClientOptions {
   /** When set, replaces every per-route timeout (env override). */
   timeoutOverrideMs?: number;
   maxRetries?: number;
+  maxResponseBytes?: number;
   logger?: Logger;
 }
 
@@ -38,12 +39,14 @@ export class WebAnalyzerClient {
   private readonly baseUrl: string;
   private readonly timeoutOverrideMs: number | undefined;
   private readonly maxRetries: number;
+  private readonly maxResponseBytes: number | undefined;
   private readonly logger: Logger | undefined;
 
   constructor(options: WebClientOptions) {
     this.baseUrl = options.baseUrl.replace(/\/+$/, "");
     this.timeoutOverrideMs = options.timeoutOverrideMs;
     this.maxRetries = options.maxRetries ?? 1;
+    this.maxResponseBytes = options.maxResponseBytes;
     this.logger = options.logger;
   }
 
@@ -64,6 +67,9 @@ export class WebAnalyzerClient {
           label: `web-analyzer ${route.key}`,
           timeoutMs: this.timeoutOverrideMs ?? route.timeoutMs,
           maxRetries: this.maxRetries,
+          ...(this.maxResponseBytes !== undefined
+            ? { maxResponseBytes: this.maxResponseBytes }
+            : {}),
           ...(signal ? { signal } : {}),
           ...(this.logger ? { logger: this.logger } : {}),
         });

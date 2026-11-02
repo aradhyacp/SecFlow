@@ -91,6 +91,9 @@ export class OpenRouterModelClient implements ModelClient {
 
     this.options.logger.debug(
       {
+        runId: request.runId,
+        event: "model_call",
+        operation: "decide",
         model: this.modelId,
         toolCalls: decision.toolCalls.map((call) => call.toolName),
         finishReason: decision.finishReason,
@@ -118,7 +121,14 @@ export class OpenRouterModelClient implements ModelClient {
       });
 
       this.options.logger.debug(
-        { model: this.modelId, durationMs: Date.now() - startedAt, usage: result.usage },
+        {
+          runId: request.runId,
+          event: "model_call",
+          operation: "generate_object",
+          model: this.modelId,
+          durationMs: Date.now() - startedAt,
+          usage: result.usage,
+        },
         "model structured object",
       );
 

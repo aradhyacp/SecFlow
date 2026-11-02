@@ -15,6 +15,7 @@ export interface ReconClientOptions {
   baseUrl: string;
   timeoutMs?: number;
   maxRetries?: number;
+  maxResponseBytes?: number;
   logger?: Logger;
 }
 
@@ -22,12 +23,14 @@ export class ReconAnalyzerClient {
   private readonly baseUrl: string;
   private readonly timeoutMs: number;
   private readonly maxRetries: number;
+  private readonly maxResponseBytes: number | undefined;
   private readonly logger: Logger | undefined;
 
   constructor(options: ReconClientOptions) {
     this.baseUrl = options.baseUrl.replace(/\/+$/, "");
     this.timeoutMs = options.timeoutMs ?? 60_000;
     this.maxRetries = options.maxRetries ?? 1;
+    this.maxResponseBytes = options.maxResponseBytes;
     this.logger = options.logger;
   }
 
@@ -45,6 +48,7 @@ export class ReconAnalyzerClient {
         body: JSON.stringify({ query }),
         timeoutMs: this.timeoutMs,
         maxRetries: this.maxRetries,
+        ...(this.maxResponseBytes !== undefined ? { maxResponseBytes: this.maxResponseBytes } : {}),
         ...(signal ? { signal } : {}),
         ...(this.logger ? { logger: this.logger } : {}),
       });

@@ -28,7 +28,10 @@ export function createApp({ config, runner, logger, startedAt }: AppDependencies
       logger,
       genReqId: (req, res) => {
         const existing = req.headers["x-request-id"];
-        const id = typeof existing === "string" && existing.length > 0 ? existing : randomUUID();
+        const id =
+          typeof existing === "string" && existing.trim().length > 0 && existing.length <= 200
+            ? existing
+            : randomUUID();
         res.setHeader("x-request-id", id);
         return id;
       },

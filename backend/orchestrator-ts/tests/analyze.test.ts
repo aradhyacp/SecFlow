@@ -8,6 +8,7 @@ import { loadConfig } from "../src/config.js";
 import { createLogger } from "../src/logger.js";
 import { createAnalysisRunner } from "../src/pipeline/index.js";
 import type { AnalysisRunner, AnalysisRequest, AnalysisResponse } from "../src/pipeline/types.js";
+import { SsrfBlockedError } from "../src/security/networkGuard.js";
 import { startServer, tempReportsDir, type TestServer } from "./helpers/server.js";
 
 const servers: TestServer[] = [];
@@ -178,7 +179,11 @@ describe("POST /api/smart-analyze", () => {
     const { server } = await appWithRunner(runner);
 
     const form = new FormData();
-    form.append("file", new Blob(["hello secflow"], { type: "application/octet-stream" }), "sample.bin");
+    form.append(
+      "file",
+      new Blob(["hello secflow"], { type: "application/octet-stream" }),
+      "sample.bin",
+    );
 
     const response = await fetch(`${server.baseUrl}/api/smart-analyze`, {
       method: "POST",
@@ -194,7 +199,25 @@ describe("POST /api/smart-analyze", () => {
     await expect(readFile(uploadedPath)).rejects.toThrow();
   });
 
-  it("returns 501 until the graph is wired (step 2 shell)", async () => {
+  it("maps a prohibited network target to HTTP 400", async () => {
+    const runner: AnalysisRunner = {
+      async run(): Promise<AnalysisResponse> {
+        throw new SsrfBlockedError("Prohibited network target: it is an IPv4 loopback address.");
+      },
+    };
+    const { server } = await appWithRunner(runner);
+
+    const response = await fetch(`${server.baseUrl}/api/smart-analyze`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ target: "http://127.0.0.1/admin" }),
+    });
+
+    expect(response.status).toBe(400);
+    expect(((await response.json()) as { error: string }).error).toMatch(/loopback/);
+  });
+
+  it("returns 503 when the production runner has no model key", async () => {
     const config = loadConfig({ NODE_ENV: "test", REPORTS_DIR: tempReportsDir() });
     const runner = createAnalysisRunner(config, createLogger(config));
     const server = await startServer(createApp({ config, runner, logger: createLogger(config) }));
@@ -206,8 +229,8 @@ describe("POST /api/smart-analyze", () => {
       body: JSON.stringify({ target: "8.8.8.8" }),
     });
 
-    expect(response.status).toBe(501);
-    expect((await response.json() as { error: string }).error).toMatch(/not implemented/i);
+    expect(response.status).toBe(503);
+    expect(((await response.json()) as { error: string }).error).toMatch(/OPENROUTER_API_KEY/);
   });
 });
 

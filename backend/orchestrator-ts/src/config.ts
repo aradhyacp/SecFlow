@@ -9,6 +9,22 @@ const booleanString = z
   .enum(["true", "false", "1", "0"])
   .transform((value) => value === "true" || value === "1");
 
+const analyzerBaseUrl = z
+  .string()
+  .url()
+  .refine((value) => {
+    try {
+      const parsed = new URL(value);
+      return (
+        (parsed.protocol === "http:" || parsed.protocol === "https:") &&
+        parsed.username.length === 0 &&
+        parsed.password.length === 0
+      );
+    } catch {
+      return false;
+    }
+  }, "must be an HTTP(S) URL without embedded credentials");
+
 const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   PORT: z.coerce.number().int().min(1).max(65_535).default(5000),
@@ -34,16 +50,22 @@ const envSchema = z.object({
 
   ANALYZER_TIMEOUT_MS: z.coerce.number().int().positive().default(60_000),
   ANALYZER_MAX_RETRIES: z.coerce.number().int().min(0).max(5).default(1),
+  /** Hard cap on an analyzer response body; prevents decompiler dumps from exhausting memory. */
+  ANALYZER_MAX_RESPONSE_BYTES: z.coerce
+    .number()
+    .int()
+    .positive()
+    .max(100 * 1024 * 1024)
+    .default(25 * 1024 * 1024),
   TOTAL_ANALYSIS_TIMEOUT_MS: z.coerce.number().int().positive().default(600_000),
 
-  ANALYZER_MALWARE_URL: z
-    .string()
-    .url()
-    .default("http://malware-analyzer:5000/api/malware-analyzer"),
-  ANALYZER_STEG_URL: z.string().url().default("http://steg-analyzer:5000/api/steg-analyzer"),
-  ANALYZER_RECON_URL: z.string().url().default("http://recon-analyzer:5000/api/Recon-Analyzer"),
-  ANALYZER_WEB_URL: z.string().url().default("http://web-analyzer:5000/api/web-analyzer"),
-  ANALYZER_MACRO_URL: z.string().url().default("http://macro-analyzer:5000/api/macro-analyzer"),
+  ANALYZER_MALWARE_URL: analyzerBaseUrl.default(
+    "http://malware-analyzer:5000/api/malware-analyzer",
+  ),
+  ANALYZER_STEG_URL: analyzerBaseUrl.default("http://steg-analyzer:5000/api/steg-analyzer"),
+  ANALYZER_RECON_URL: analyzerBaseUrl.default("http://recon-analyzer:5000/api/Recon-Analyzer"),
+  ANALYZER_WEB_URL: analyzerBaseUrl.default("http://web-analyzer:5000/api/web-analyzer"),
+  ANALYZER_MACRO_URL: analyzerBaseUrl.default("http://macro-analyzer:5000/api/macro-analyzer"),
 
   ANALYZER_MALWARE_TIMEOUT_MS: z.coerce.number().int().positive().optional(),
   ANALYZER_STEG_TIMEOUT_MS: z.coerce.number().int().positive().optional(),
@@ -86,6 +108,7 @@ export interface AppConfig {
   analyzers: Record<AnalyzerName, AnalyzerEndpointConfig>;
   analyzerTimeoutMs: number;
   analyzerMaxRetries: number;
+  analyzerMaxResponseBytes: number;
   totalAnalysisTimeoutMs: number;
   allowPrivateTargets: boolean;
 }
@@ -170,6 +193,7 @@ export function loadConfig(env: RawEnv = process.env): AppConfig {
     analyzers,
     analyzerTimeoutMs: raw.ANALYZER_TIMEOUT_MS,
     analyzerMaxRetries: raw.ANALYZER_MAX_RETRIES,
+    analyzerMaxResponseBytes: raw.ANALYZER_MAX_RESPONSE_BYTES,
     totalAnalysisTimeoutMs: raw.TOTAL_ANALYSIS_TIMEOUT_MS,
     allowPrivateTargets: raw.ALLOW_PRIVATE_TARGETS,
   };

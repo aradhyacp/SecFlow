@@ -125,7 +125,7 @@ describeLive("OpenRouter prompt behavior", () => {
       }),
       schema: decisionSchemaFor(["analyze_web"]),
       temperature: 0,
-      maxOutputTokens: 300,
+      maxOutputTokens: 2_048,
     });
 
     expect(result.action).toBe("analyze_web");

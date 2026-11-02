@@ -153,6 +153,7 @@ Current suite: **110 passed, 7 skipped** (2 OpenRouter live, 5 analyzer live).
 - Unknown **files** expose all file analyzers; there is no model-based
   classification fallback yet (Step 9 prompt work).
 - Tool execution is sequential by design; no parallel analyzer calls.
-- SSRF checks for URLs/domains are wired in Step 10.
-- The HTTP runner and report generation remain unwired until Steps 8/10; this
-  step exposes `runAnalysisLoop()` for the runner to call.
+- SSRF checks for the initial target and every model-selected network target
+  are enforced in Step 10 (see `09-reliability-security.md`).
+- This step exposed `runAnalysisLoop()`; Step 10 adds the production HTTP
+  runner, finalization, report generation and error mapping around it.

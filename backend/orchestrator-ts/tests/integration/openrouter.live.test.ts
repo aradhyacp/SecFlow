@@ -33,7 +33,7 @@ describeLive("OpenRouter live provider", () => {
         reason: z.string(),
       }),
       temperature: 0,
-      maxOutputTokens: 200,
+      maxOutputTokens: 1_024,
     });
 
     expect(result.kind).toBe("ip");

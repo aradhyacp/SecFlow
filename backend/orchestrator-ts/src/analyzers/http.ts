@@ -29,9 +29,13 @@ export interface JsonRequestOptions {
   timeoutMs: number;
   maxRetries?: number;
   retryDelayMs?: number;
+  /** Maximum response body accepted from an analyzer. */
+  maxResponseBytes?: number;
   signal?: AbortSignal;
   logger?: Logger;
 }
+
+const DEFAULT_MAX_RESPONSE_BYTES = 25 * 1024 * 1024;
 
 function isRetriableStatus(status: number): boolean {
   return status === 429 || status === 500 || status === 502 || status === 503 || status === 504;
@@ -54,6 +58,57 @@ function isRetriableError(error: unknown): boolean {
 
 function preview(text: string, maxChars = 2_000): string {
   return text.length > maxChars ? `${text.slice(0, maxChars)}…` : text;
+}
+
+async function readResponseText(
+  response: Response,
+  label: string,
+  maxBytes: number,
+): Promise<string> {
+  const declaredLength = Number(response.headers.get("content-length"));
+  if (Number.isFinite(declaredLength) && declaredLength > maxBytes) {
+    await response.body?.cancel().catch(() => undefined);
+    throw new AnalyzerHttpError(`${label} response exceeded ${maxBytes} bytes`, {
+      status: response.status,
+      retriable: false,
+    });
+  }
+
+  if (!response.body) {
+    return "";
+  }
+
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  try {
+    for (;;) {
+      const result = (await reader.read()) as {
+        done: boolean;
+        value?: Uint8Array;
+      };
+      if (result.done) {
+        break;
+      }
+      const value = result.value;
+      if (!value) {
+        continue;
+      }
+      total += value.byteLength;
+      if (total > maxBytes) {
+        await reader.cancel().catch(() => undefined);
+        throw new AnalyzerHttpError(`${label} response exceeded ${maxBytes} bytes`, {
+          status: response.status,
+          retriable: false,
+        });
+      }
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+
+  return Buffer.concat(chunks).toString("utf8");
 }
 
 /**
@@ -83,7 +138,11 @@ export async function requestJson<T = unknown>(
         signal,
       });
 
-      const text = await response.text();
+      const text = await readResponseText(
+        response,
+        options.label,
+        options.maxResponseBytes ?? DEFAULT_MAX_RESPONSE_BYTES,
+      );
       if (!response.ok) {
         throw new AnalyzerHttpError(`${options.label} returned HTTP ${response.status}`, {
           status: response.status,
@@ -112,9 +171,11 @@ export async function requestJson<T = unknown>(
       const delay = Math.min(retryDelayMs * 2 ** attempt, 5_000);
       options.logger?.warn(
         {
+          event: "analyzer_retry",
           label: options.label,
           attempt: attempt + 1,
           delayMs: delay,
+          elapsedMs: Date.now() - startedAt,
           error: error instanceof Error ? error.message : String(error),
         },
         "analyzer request retry",

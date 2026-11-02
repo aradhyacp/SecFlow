@@ -103,8 +103,11 @@ details, tool history, errors, and limitations. The visual layout is intentional
 simplified relative to the Python template, but the data and security escaping
 are preserved. JSON and HTML are written to
 `REPORTS_DIR/<job_id>/report.json` and `report.html`; the job id must be a
-16-character lowercase hex value (the runner supplies `sha256(input)[:16]`, with
-a hash fallback for tests).
+16-character lowercase hex value. The production runner supplies
+`sha256(target_string)[:16]` for URL/IP/domain inputs and
+`sha256(file_contents)[:16]` for uploads, with a hash fallback for tests. The
+file-content hash makes repeated uploads of the same sample resolve to the same
+report instead of Python's per-request temp-path hash.
 
 ### Report failure policy
 
@@ -127,7 +130,7 @@ Independent tests cover:
 - end-to-end finalization, insufficient-evidence skips, generation failures, no
   findings, and missing generation tools.
 
-Current suite: **145 passed, 9 skipped** (live OpenRouter/analyzer tests remain
+Current suite: **163 passed, 9 skipped** (live OpenRouter/analyzer tests remain
 gated behind their environment flags).
 
 ## Deviations from the Python implementation

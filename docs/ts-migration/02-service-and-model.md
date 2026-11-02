@@ -24,12 +24,15 @@ src/
   pipeline/
     types.ts               SecFlow contract, ResolvedInput, AnalysisRunner
     resolveInput.ts        multipart → temp file, JSON → target
-    index.ts               runner factory (graph wired in steps 5–8)
+    index.ts               production runner: input hash, run-scoped tools,
+                           finalize/report, timeout and error mapping
+  security/
+    networkGuard.ts        SSRF policy for URL/IP/domain targets
   model/
     types.ts               ModelClient interface (provider-agnostic)
     client.ts              Vercel AI SDK adapter (generateText/Output.object)
     provider.ts            @openrouter/ai-sdk-provider construction
-tests/                     37 unit/contract tests + 1 gated live test
+tests/                     unit/contract tests plus environment-gated live tests
 ```
 
 `Dockerfile`, `.env.example`, `.dockerignore`, `pinned package-lock.json` included.
@@ -49,11 +52,12 @@ All parsing/validation is centralised. Invalid values fail fast at startup with 
 | `MODEL_MAX_CYCLES`                            | `12`                                     | Model decisions per run; 12 covers the 5-pass max plus finish/validation slack. |
 | `MODEL_MAX_TOOL_CALLS`                        | `20`                                     | Hard cap on analyzer-tool executions per run.                                   |
 | `ANALYZER_TIMEOUT_MS`                         | `60000`                                  | Default, overridable per analyzer.                                              |
+| `ANALYZER_MAX_RESPONSE_BYTES`                 | `26214400`                               | 25 MiB body cap; oversized responses fail without being buffered.               |
 | `TOTAL_ANALYSIS_TIMEOUT_MS`                   | `600000`                                 | Whole-run deadline.                                                             |
 | `ANALYZER_{MALWARE,STEG,RECON,WEB,MACRO}_URL` | Docker-internal URLs                     | Trailing slashes trimmed.                                                       |
 | `ANALYZER_*_TIMEOUT_MS`                       | inherits default                         | e.g. Ghidra needs 240 s.                                                        |
 | `MAX_UPLOAD_BYTES`                            | `52428800`                               | 50 MB, matches analyzer caps.                                                   |
-| `ALLOW_PRIVATE_TARGETS`                       | `false`                                  | SSRF guard toggle (wired in Step 10).                                           |
+| `ALLOW_PRIVATE_TARGETS`                       | `false`                                  | SSRF guard toggle; enforced before the graph and in every analyzer tool.        |
 | `ALLOW_MISSING_OPENROUTER_KEY`                | `false`                                  | Dry-run escape hatch; readiness stays 503.                                      |
 
 ## 3. HTTP compatibility
@@ -102,7 +106,7 @@ about the current default.
 cd backend/orchestrator-ts
 npm run typecheck   # clean
 npm run lint        # clean
-npm test            # 145 passed | 9 skipped without a key
+npm test            # 163 passed | 9 skipped without a key
 ```
 
 The skipped tests include the live OpenRouter calls

@@ -106,6 +106,7 @@ export async function generateYaraRules(
       schema: yaraGenerationDraftSchema,
       temperature: 0.1,
       maxOutputTokens: 4_096,
+      runId: state.runId,
       ...(options.signal ? { abortSignal: options.signal } : {}),
     });
   } catch (error) {
@@ -184,6 +185,7 @@ export async function generateSigmaRules(
       schema: sigmaGenerationDraftSchema,
       temperature: 0.1,
       maxOutputTokens: 4_096,
+      runId: state.runId,
       ...(options.signal ? { abortSignal: options.signal } : {}),
     });
   } catch (error) {

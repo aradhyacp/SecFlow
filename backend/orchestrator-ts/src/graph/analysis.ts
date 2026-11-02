@@ -31,6 +31,7 @@ import {
 } from "./state.js";
 import type { AnalysisToolName } from "./schema/tools.js";
 import type { ToolRegistry } from "./tools.js";
+import type { NetworkGuard } from "../security/networkGuard.js";
 
 const ANALYZER_TOOL: Record<AnalyzerName, AnalysisToolName> = {
   malware: "analyze_malware",
@@ -47,7 +48,10 @@ export interface AnalysisGraphOptions {
   maxPasses: PassCount;
   maxCycles: number;
   maxToolCalls: number;
+  /** Output budget for one decision; reasoning tokens count against this. */
+  decisionMaxOutputTokens?: number;
   rawOutputStore: RawOutputStore;
+  guard?: NetworkGuard;
   logger?: Logger;
   signal?: AbortSignal;
 }
@@ -159,6 +163,10 @@ export function buildAnalysisGraph(options: AnalysisGraphOptions) {
     logger,
     signal,
   } = options;
+  // Reasoning-capable models spend reasoning tokens from this same budget.
+  // 500 tokens was enough for a bare JSON decision but truncated before the
+  // JSON object when the model reasoned first.
+  const decisionMaxOutputTokens = options.decisionMaxOutputTokens ?? 2_048;
 
   const toolDescriptions: Record<string, string> = {};
   for (const name of tools.names()) {
@@ -231,7 +239,14 @@ export function buildAnalysisGraph(options: AnalysisGraphOptions) {
         reasoning: `Deterministic classifier selected ${first.tool} for ${state.inputType} input.`,
       };
       logger?.info(
-        { runId, pass: state.counters.passes + 1, tool: action.tool, targetId: action.targetId },
+        {
+          runId,
+          event: "decision",
+          source: "deterministic",
+          pass: state.counters.passes + 1,
+          tool: action.tool,
+          targetId: action.targetId,
+        },
         "deterministic first analyzer",
       );
       return { pendingAction: action };
@@ -254,7 +269,8 @@ export function buildAnalysisGraph(options: AnalysisGraphOptions) {
         prompt,
         schema: decisionSchemaFor(toolNames),
         temperature: 0,
-        maxOutputTokens: 500,
+        maxOutputTokens: decisionMaxOutputTokens,
+        runId,
         ...(signal ? { abortSignal: signal } : {}),
       });
     } catch (error) {
@@ -262,7 +278,10 @@ export function buildAnalysisGraph(options: AnalysisGraphOptions) {
         throw error;
       }
       const message = error instanceof Error ? error.message : String(error);
-      logger?.error({ runId, error: message }, "model decision failed");
+      logger?.error(
+        { runId, event: "decision", source: "model", error: message },
+        "model decision failed",
+      );
       return {
         errors: [
           errorEntry(
@@ -291,7 +310,10 @@ export function buildAnalysisGraph(options: AnalysisGraphOptions) {
 
     if (!validation.ok) {
       const message = `Rejected model decision: ${validation.error}`;
-      logger?.warn({ runId, error: validation.error }, "rejected model decision");
+      logger?.warn(
+        { runId, event: "decision", source: "model", error: validation.error },
+        "rejected model decision",
+      );
       return {
         errors: [
           errorEntry(
@@ -314,7 +336,13 @@ export function buildAnalysisGraph(options: AnalysisGraphOptions) {
 
     if (validation.action === null) {
       logger?.info(
-        { runId, passes: state.counters.passes, reasoning: validation.reasoning },
+        {
+          runId,
+          event: "decision",
+          source: "model",
+          passes: state.counters.passes,
+          reasoning: validation.reasoning,
+        },
         "model finished analysis",
       );
       return {
@@ -327,6 +355,8 @@ export function buildAnalysisGraph(options: AnalysisGraphOptions) {
     logger?.info(
       {
         runId,
+        event: "decision",
+        source: "model",
         pass: state.counters.passes + 1,
         tool: validation.action.tool,
         targetId: validation.action.targetId,
@@ -342,6 +372,18 @@ export function buildAnalysisGraph(options: AnalysisGraphOptions) {
     if (!action) {
       return {};
     }
+    logger?.debug(
+      {
+        runId,
+        event: "graph_transition",
+        from: "decide",
+        to: "act",
+        tool: action.tool,
+        targetId: action.targetId,
+        pass: state.counters.passes + 1,
+      },
+      "graph transition",
+    );
 
     const target = state.targets.find((candidate) => candidate.id === action.targetId);
     if (!target) {
@@ -419,7 +461,18 @@ export function buildAnalysisGraph(options: AnalysisGraphOptions) {
 
     if (!result.ok) {
       const message = result.error;
-      logger?.error({ runId, tool: action.tool, error: message }, "analyzer tool failed");
+      logger?.error(
+        {
+          runId,
+          event: "tool_call",
+          status: "failed",
+          tool: action.tool,
+          targetId: action.targetId,
+          durationMs,
+          error: message,
+        },
+        "analyzer tool failed",
+      );
       return {
         toolHistory: [
           historyEntry({
@@ -491,6 +544,8 @@ export function buildAnalysisGraph(options: AnalysisGraphOptions) {
     logger?.info(
       {
         runId,
+        event: "tool_call",
+        status: "succeeded",
         pass,
         tool: action.tool,
         targetId: action.targetId,
@@ -518,7 +573,20 @@ export function buildAnalysisGraph(options: AnalysisGraphOptions) {
   }
 
   function afterDecide(state: AnalysisGraphState): "act" | typeof END {
-    if (state.termination || !state.pendingAction) {
+    const next = state.termination || !state.pendingAction ? "end" : "act";
+    logger?.debug(
+      {
+        runId,
+        event: "graph_transition",
+        from: "decide",
+        to: next,
+        ...(state.termination
+          ? { termination: state.termination.reason, detail: state.termination.detail }
+          : { pendingAction: state.pendingAction?.tool }),
+      },
+      "graph transition",
+    );
+    if (next === "end") {
       return END;
     }
     return "act";
@@ -582,6 +650,10 @@ function initialState(input: {
  */
 export async function runAnalysisLoop(options: AnalysisLoopOptions): Promise<AnalysisLoopResult> {
   const classified = await classifyInput(options.input);
+  // Block the initial network target before any analyzer is invoked. Artifact
+  // targets are guarded again inside each analyzer tool.
+  await options.guard?.assertTargetAllowed(classified.target);
+
   const state = initialState({
     classified,
     source: options.input,

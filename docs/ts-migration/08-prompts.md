@@ -95,8 +95,8 @@ YARA and SIGMA prompts use the bounded evidence packet from Step 8. They state:
    summary/recommendations.
 
 The model never supplies findings, risk scores, paths, rules, or timestamps.
-Production should inject the model in the runner/report registry in Step 10;
-unit finalization currently uses the deterministic path.
+The Step 10 production runner injects the model into the report registry. Unit
+finalization tests may still use the deterministic path by passing no model.
 
 ## Chat/system prompt
 
@@ -130,13 +130,13 @@ model-selected follow-up: a web pass discovers an extracted payload URL, and the
 model must choose `analyze_web` on that URL target. The other asks for the
 grounded report narrative. Both passed locally on 2026-11-02.
 
-Current suite: **145 passed, 9 skipped** (live analyzer/OpenRouter tests remain
+Current suite: **163 passed, 9 skipped** (live analyzer/OpenRouter tests remain
 environment-gated).
 
 ## Deviations and notes
 
-- Report narrative enhancement is optional and disabled by default until the
-  runner injects the model in Step 10.
+- Report narrative enhancement is optional; production injects the run model,
+  while tests can disable it with `reportModel: null`.
 - No chat prompt migration applies because no chat feature exists.
 - The prompt policy is duplicated into prompts as text but remains enforced by
   schemas and tool code, as required by the security section of the migration

@@ -115,6 +115,7 @@ beforeAll(async () => {
     ANALYZER_MACRO_URL: `${server.baseUrl}/api/macro-analyzer`,
     ANALYZER_TIMEOUT_MS: "5000",
     ANALYZER_MAX_RETRIES: "0",
+    ALLOW_PRIVATE_TARGETS: "1",
   });
   const logger = createLogger(config);
   registry = createAnalyzerToolRegistry(config, logger);
