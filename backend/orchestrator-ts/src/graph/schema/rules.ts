@@ -12,6 +12,10 @@ export const ruleArtifactSchema = z
   .object({
     id: z.string().regex(/^rule_[a-f0-9]{16}$/),
     kind: ruleKindSchema,
+    /** Detected rule/title name; derived from the validated content. */
+    name: z.string().min(1).max(200).optional(),
+    description: z.string().max(2_000).optional(),
+    tags: z.array(z.string().max(100)).max(50).default([]),
     content: z.string().min(1).max(200_000),
     reasoning: z.string().max(10_000),
     status: ruleStatusSchema,
@@ -39,6 +43,8 @@ export const ruleGenerationOutputSchema = z
     status: z.enum(["generated", "skipped", "invalid"]),
     rules: z.array(ruleArtifactSchema).max(50),
     reason: z.string().max(2_000).optional(),
+    /** Present when the generation call itself failed (as opposed to a skip). */
+    error: z.string().max(4_000).optional(),
   })
   .strict();
 export type RuleGenerationOutput = z.infer<typeof ruleGenerationOutputSchema>;

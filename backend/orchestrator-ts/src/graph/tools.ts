@@ -3,10 +3,12 @@ import type { z } from "zod";
 
 import type { Logger } from "../logger.js";
 import type { RawOutputStore } from "./rawOutputStore.js";
-import type { AnalysisTarget } from "./state.js";
+import type { AnalysisState, AnalysisTarget } from "./state.js";
 
 export interface ToolContext {
   runId: string;
+  /** Stable report id for this run; generation tools never derive paths from user input. */
+  jobId?: string;
   signal?: AbortSignal;
   logger?: Logger;
   /** 1-indexed pass currently executing. */
@@ -15,13 +17,14 @@ export interface ToolContext {
   targets?: ReadonlyMap<string, AnalysisTarget>;
   /** Full-output storage used by analyzer tools. */
   rawOutputStore?: RawOutputStore;
+  /** Validated graph snapshot for post-analysis stages. */
+  state?: Readonly<AnalysisState>;
 }
 
 export type ToolFailureKind = "validation" | "execution" | "unknown_tool";
 
 export type ToolExecutionResult =
-  | { ok: true; output: unknown }
-  | { ok: false; kind: ToolFailureKind; error: string };
+  { ok: true; output: unknown } | { ok: false; kind: ToolFailureKind; error: string };
 
 export interface ToolSpec<TInput, TOutput = unknown> {
   name: string;
@@ -54,7 +57,9 @@ export function formatIssues(error: z.ZodError): string {
  * turned into values, never thrown: graph nodes must be able to feed a tool
  * error back to the model without aborting the run.
  */
-export function defineTool<TInput, TOutput = unknown>(spec: ToolSpec<TInput, TOutput>): RegisteredTool {
+export function defineTool<TInput, TOutput = unknown>(
+  spec: ToolSpec<TInput, TOutput>,
+): RegisteredTool {
   return {
     name: spec.name,
     description: spec.description,
