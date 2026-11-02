@@ -1,13 +1,23 @@
-import { describe, expect, it } from "vitest";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+
+import { afterEach, describe, expect, it } from "vitest";
 
 import { runAnalysisLoop } from "../src/graph/analysis.js";
 import { InMemoryRawOutputStore } from "../src/graph/rawOutputStore.js";
 import { makeTargetId } from "../src/graph/ids.js";
+import type { PayloadDownloader } from "../src/pipeline/payloadDownloader.js";
 import type { PassCount, ResolvedInput } from "../src/pipeline/types.js";
 import { choose, finish, ScriptedDecisionModel } from "./helpers/decisionModel.js";
 import { createFakeAnalyzerRegistry, findingSet } from "./helpers/fakeAnalyzers.js";
 
 const RUN_ID = "run-analysis-loop-test";
+const tempDirs: string[] = [];
+
+afterEach(async () => {
+  await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })));
+});
 
 function targetInput(value: string): ResolvedInput {
   return {
@@ -233,18 +243,132 @@ describe("analysis decision loop", () => {
     expect(model.requests).toHaveLength(0);
   });
 
-  it("terminates unsupported input without calling the model", async () => {
-    const { registry, calls } = createFakeAnalyzerRegistry(() => findingSet());
-    const model = new ScriptedDecisionModel([finish()]);
+  it("falls back to model-selected recon for an unknown string", async () => {
+    const value = "plain words that are not an indicator";
+    const { registry, calls } = createFakeAnalyzerRegistry(() => findingSet("username footprint"));
+    const model = new ScriptedDecisionModel([
+      choose("analyze_recon", makeTargetId("unknown", value), "The input may be a username."),
+      finish("The footprint pass completed."),
+    ]);
 
     const result = await runAnalysisLoop({
       ...options(model, registry),
-      input: targetInput("plain words that are not an indicator"),
+      input: targetInput(value),
     });
 
-    expect(result.status).toBe("failed");
-    expect(result.state.termination?.reason).toBe("unsupported_input");
-    expect(calls).toHaveLength(0);
-    expect(model.requests).toHaveLength(0);
+    expect(result.status).toBe("completed");
+    expect(calls.map((call) => call.tool)).toEqual(["analyze_recon"]);
+    expect(result.state.findings).toHaveLength(1);
+    expect(result.state.target.kind).toBe("unknown");
+    expect(model.requests).toHaveLength(1);
+    expect(model.requests[0]?.prompt).toContain("plain words that are not an indicator");
+  });
+
+  it("offers all file analyzers for an unknown upload", async () => {
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), "secflow-unknown-file-"));
+    tempDirs.push(tempDir);
+    const filePath = path.join(tempDir, "sample.dat");
+    await writeFile(filePath, "not a known file signature");
+
+    const { registry, calls } = createFakeAnalyzerRegistry(() => findingSet("synthetic file scan"));
+    const model = new ScriptedDecisionModel([
+      choose(
+        "analyze_malware",
+        makeTargetId("file", filePath),
+        "The file head is ambiguous, so try the malware analyzer first.",
+      ),
+      finish("The file pass completed."),
+    ]);
+
+    const result = await runAnalysisLoop({
+      ...options(model, registry),
+      input: {
+        kind: "file",
+        value: filePath,
+        displayName: "sample.dat",
+        originalName: "sample.dat",
+        sizeBytes: 26,
+        cleanup: async () => undefined,
+      },
+    });
+
+    expect(result.status).toBe("completed");
+    expect(calls.map((call) => call.tool)).toEqual(["analyze_malware"]);
+    expect(model.requests[0]?.prompt).toContain("Classification preview");
+    expect(model.requests[0]?.prompt).toContain("not a known file signature");
+    expect(model.requests[0]?.prompt).toContain("analyze_steg");
+    expect(model.requests[0]?.prompt).toContain("analyze_macro");
+  });
+
+  it("downloads a payload on finish and sends it to the matching file analyzer", async () => {
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), "secflow-payload-loop-"));
+    tempDirs.push(tempDir);
+    const payloadPath = path.join(tempDir, "dropper.exe");
+    await writeFile(payloadPath, "MZ synthetic payload");
+
+    const downloads: string[] = [];
+    const downloader: PayloadDownloader = {
+      async download(url) {
+        downloads.push(url);
+        return {
+          url,
+          path: payloadPath,
+          contentType: "application/x-dosexec",
+          sizeBytes: 21,
+        };
+      },
+      async cleanup() {
+        // The production runner owns cleanup; the graph only selects the target.
+      },
+    };
+
+    const { registry, calls } = createFakeAnalyzerRegistry((tool) => {
+      if (tool === "analyze_web") {
+        return {
+          findings: [
+            {
+              type: "embedded_payload",
+              detail: "The page links to an executable",
+              severity: "medium",
+              evidence: "https://payload.example/dropper.exe",
+            },
+          ],
+          riskScore: 3,
+          rawOutput: "https://payload.example/dropper.exe",
+        };
+      }
+      return findingSet("PE analysis complete");
+    });
+
+    const model = new ScriptedDecisionModel([
+      finish("No further network target is useful."),
+      finish("The downloaded payload has been analyzed."),
+    ]);
+
+    const result = await runAnalysisLoop({
+      ...options(model, registry),
+      input: targetInput("https://start.example"),
+      guard: { assertTargetAllowed: async () => undefined },
+      payloadDownloader: downloader,
+    });
+
+    expect(result.status).toBe("completed");
+    expect(downloads).toEqual(["https://payload.example/dropper.exe"]);
+    expect(calls.map((call) => call.tool)).toEqual(["analyze_web", "analyze_malware"]);
+    const payloadTarget = result.state.targets.find(
+      (target) => target.origin === "payload_download",
+    );
+    expect(payloadTarget).toMatchObject({
+      kind: "file",
+      displayName: "dropper.exe",
+      sourceUrl: "https://payload.example/dropper.exe",
+    });
+    const malwareResult = result.state.findings[1];
+    expect(malwareResult?.findings[0]).toMatchObject({
+      type: "payload_downloaded",
+      severity: "high",
+      evidence: "https://payload.example/dropper.exe",
+    });
+    expect(malwareResult?.risk_score).toBe(1);
   });
 });

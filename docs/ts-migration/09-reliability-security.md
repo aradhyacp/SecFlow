@@ -149,10 +149,12 @@ name cannot be reached; `allowDnsFailure: false` provides fail-closed behaviour.
   time, while the analyzer resolves it again when fetching. The orchestrator
   cannot close that gap alone. Production deployments should add egress
   filtering / network policy to analyzer containers.
-- The TypeScript orchestrator does not perform Python's opportunistic payload
-  download. URLs discovered in evidence remain URL targets and are analyzed by
-  the web analyzer; any future download stage must call the same guard before
-  fetching. This is a Step 11 parity item.
+- Payload download is implemented in `src/pipeline/payloadDownloader.ts`. It
+  uses `fetch` with manual redirects, validates every hop with the same
+  `NetworkGuard`, streams under a 50 MiB cap, and inspects content type before
+  selecting an analyzer. A DNS response can still change between the guard's
+  lookup and the actual connection; egress policy remains the defence in
+  depth.
 
 ---
 
@@ -224,10 +226,8 @@ Live OpenRouter/analyzer tests remain gated by `OPENROUTER_API_KEY` and
 ## 8. Known limitations and follow-ups
 
 1. DNS rebinding is mitigated, not eliminated; add analyzer egress policy.
-2. The TS flow has no orchestrator-side payload download stage yet (Step 11
-   parity review).
-3. Optional YARA/SIGMA/report model work is outside the decision-loop budgets,
+2. Optional YARA/SIGMA/report model work is outside the decision-loop budgets,
    bounded instead by model timeout, retries and the total-run deadline.
-4. Logs are structured JSON only; there is no OpenTelemetry exporter.
-5. `npm run format:check` still reports pre-existing Prettier differences in
+3. Logs are structured JSON only; there is no OpenTelemetry exporter.
+4. `npm run format:check` still reports pre-existing Prettier differences in
    earlier migration files; typecheck, lint and build are clean.

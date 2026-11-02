@@ -253,7 +253,7 @@ def combined_analyze():
 
 **Option B — Have the adapter call specific GET endpoints:**
 ```python
-# In orchestrator/app/adapters/web_adapter.py
+# In backend/orchestrator-ts/src/analyzers/adapters/web.ts
 import requests
 BASE = "http://web-analyzer:5005/api/web-analyzer"
 
@@ -308,7 +308,7 @@ raw = {
 
 ## What NOT to Do
 
-- Do **not** modify this service's code to match the SecFlow contract — write/update `orchestrator/app/adapters/web_adapter.py` instead.
+- Do **not** modify this service's code to match the SecFlow contract — write/update `backend/orchestrator-ts/src/analyzers/adapters/web.ts` instead.
 - Do **not** assume a `POST /api/web-analyzer/` route exists — it doesn't (unless you add it).
 - Do **not** import service modules directly into the orchestrator — always call via HTTP.
 - Do **not** enable `API_ENABLE_RATE_LIMIT=true` in the SecFlow Docker environment — the orchestrator will hit rate limits calling this service multiple times per pipeline run.

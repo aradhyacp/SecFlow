@@ -207,6 +207,49 @@ describe("decision prompt", () => {
     expect(prompt).not.toContain("analyze_recon");
   });
 
+  it("offers recon for an unknown string fallback", () => {
+    const base = makeState();
+    const target: AnalysisTarget = {
+      ...base.target,
+      id: makeTargetId("unknown", "plain words"),
+      kind: "unknown",
+      value: "plain words",
+      displayName: "plain words",
+    };
+    const state = makeState(
+      {
+        target,
+        targets: [target],
+        inputType: "unknown",
+        classification: {
+          inputType: "unknown",
+          analyzer: null,
+          mimeType: "text/plain",
+          magicOutput: "plain words",
+          deterministic: false,
+        },
+        findings: [],
+        indicators: [],
+        toolHistory: [],
+        counters: { passes: 0, cycles: 0, toolCalls: 0, duplicateRejections: 0 },
+      },
+      [],
+    );
+    const available = buildAvailableActions({
+      targets: state.targets,
+      classification: state.classification,
+      primaryTargetId: state.target.id,
+      registeredTools: analysisToolNames,
+      history: [],
+    });
+    const prompt = promptFor(state, available);
+
+    expect(available).toEqual([{ tool: "analyze_recon", targetId: target.id }]);
+    expect(prompt).toContain("analyze_recon");
+    expect(prompt).not.toContain("analyze_web");
+    expect(prompt).not.toContain("analyze_malware");
+  });
+
   it("only permits finish when no action is available", () => {
     const base = makeState();
     const target: AnalysisTarget = {
@@ -232,7 +275,7 @@ describe("decision prompt", () => {
       targets: state.targets,
       classification: state.classification,
       primaryTargetId: state.target.id,
-      registeredTools: analysisToolNames,
+      registeredTools: ["analyze_web"],
       history: [],
     });
     const prompt = promptFor(state, available);

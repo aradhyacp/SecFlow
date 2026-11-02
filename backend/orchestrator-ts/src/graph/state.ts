@@ -65,6 +65,8 @@ export const analysisTargetSchema = z
     origin: targetOriginSchema,
     mimeType: z.string().min(1).max(255).optional(),
     sizeBytes: z.number().int().nonnegative().optional(),
+    /** Source URL for payload_download targets; never sent to the model. */
+    sourceUrl: z.string().min(1).max(4_096).optional(),
   })
   .strict();
 export type AnalysisTarget = z.infer<typeof analysisTargetSchema>;
@@ -75,6 +77,8 @@ export const classificationSchema = z
     analyzer: z.enum(["malware", "steg", "recon", "web", "macro"]).nullable(),
     mimeType: z.string().max(255),
     magicOutput: z.string().max(10_000),
+    /** Printable prefix of an unknown/ambiguous file for model fallback. */
+    fileHead: z.string().max(4_096).optional(),
     deterministic: z.boolean(),
     reasoning: z.string().max(2_000).optional(),
   })

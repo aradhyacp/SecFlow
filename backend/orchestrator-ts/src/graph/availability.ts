@@ -92,6 +92,9 @@ export function toolsForTarget(
     case "email":
     case "phone":
     case "username":
+    case "unknown":
+      // Unknown strings fall back to the recon footprint path (username mode),
+      // matching the Python AI-classification fallback for ambiguous input.
       return ["analyze_recon"];
     case "file": {
       const subtype = inferFileSubtype(target, classification, primaryTargetId);

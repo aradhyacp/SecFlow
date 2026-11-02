@@ -1,3 +1,5 @@
+import path from "node:path";
+
 import { END, START, StateGraph } from "@langchain/langgraph";
 
 import { classifyInput } from "../classifier/index.js";
@@ -15,16 +17,26 @@ import {
 import { buildArtifactTargets } from "./artifacts.js";
 import { DECISION_SYSTEM_PROMPT, buildDecisionPrompt } from "../prompts/decision.js";
 import { decisionSchemaFor, validateDecision } from "./decision.js";
-import { makeErrorId, makeToolRecordId } from "./ids.js";
+import { makeErrorId, makeTargetId, makeToolRecordId } from "./ids.js";
 import type { RawOutputStore } from "./rawOutputStore.js";
+import type { PayloadDownloader } from "../pipeline/payloadDownloader.js";
+import {
+  ensureAnalyzerFileExtension,
+  findPayloadCandidates,
+  payloadDisplayName,
+  selectAnalyzerForDownload,
+  shouldSkipDownloadContentType,
+} from "../pipeline/payloads.js";
 import {
   AnalysisStateAnnotation,
   analysisStateSchema,
   emptyCounters,
   emptyReportState,
+  type AnalysisAction,
   type AnalysisError,
   type AnalysisGraphState,
   type AnalysisState,
+  type AnalysisTarget,
   type Termination,
   type TerminationReason,
   type ToolHistoryEntry,
@@ -41,6 +53,12 @@ const ANALYZER_TOOL: Record<AnalyzerName, AnalysisToolName> = {
   macro: "analyze_macro",
 };
 
+const FILE_ANALYZERS = ["malware", "steg", "macro"] as const;
+
+function isFileAnalyzer(value: string | null): value is (typeof FILE_ANALYZERS)[number] {
+  return value !== null && (FILE_ANALYZERS as readonly string[]).includes(value);
+}
+
 export interface AnalysisGraphOptions {
   model: ModelClient;
   tools: ToolRegistry;
@@ -52,6 +70,8 @@ export interface AnalysisGraphOptions {
   decisionMaxOutputTokens?: number;
   rawOutputStore: RawOutputStore;
   guard?: NetworkGuard;
+  /** Enables download-and-analyze when the model signals finish. */
+  payloadDownloader?: PayloadDownloader;
   logger?: Logger;
   signal?: AbortSignal;
 }
@@ -167,6 +187,159 @@ export function buildAnalysisGraph(options: AnalysisGraphOptions) {
   // 500 tokens was enough for a bare JSON decision but truncated before the
   // JSON object when the model reasoned first.
   const decisionMaxOutputTokens = options.decisionMaxOutputTokens ?? 2_048;
+
+  function safeHost(url: string): string {
+    try {
+      return new URL(url).hostname;
+    } catch {
+      return "invalid-url";
+    }
+  }
+
+  /**
+   * When the model finishes, mirror the Python pipeline's final attempt to
+   * fetch a concrete payload URL from the latest pass. Every redirect and the
+   * final destination are checked by the same SSRF guard used for analysis.
+   */
+  async function nextPayloadAction(
+    state: AnalysisGraphState,
+  ): Promise<{ action: AnalysisAction; target: AnalysisTarget } | null> {
+    const downloader = options.payloadDownloader;
+    if (!downloader || !options.guard) {
+      return null;
+    }
+
+    const latest = state.findings[state.findings.length - 1];
+    if (!latest) {
+      return null;
+    }
+
+    const alreadyDownloaded = new Set(
+      state.targets
+        .filter((target) => target.origin === "payload_download" && target.sourceUrl)
+        .map((target) => target.sourceUrl!),
+    );
+    const candidates = findPayloadCandidates(latest, alreadyDownloaded);
+
+    for (const candidate of candidates) {
+      let downloaded;
+      try {
+        downloaded = await downloader.download(candidate, {
+          guard: options.guard,
+          ...(signal ? { signal } : {}),
+        });
+      } catch (error) {
+        if (signal?.aborted) {
+          throw error;
+        }
+        logger?.warn(
+          {
+            runId,
+            event: "payload_download",
+            status: "failed",
+            host: safeHost(candidate),
+            error: error instanceof Error ? error.message : String(error),
+          },
+          "payload download failed",
+        );
+        continue;
+      }
+
+      if (shouldSkipDownloadContentType(downloaded.contentType)) {
+        logger?.info(
+          {
+            runId,
+            event: "payload_download",
+            status: "skipped",
+            host: safeHost(candidate),
+            contentType: downloaded.contentType,
+          },
+          "skipped web content during payload download",
+        );
+        continue;
+      }
+
+      let analyzer = selectAnalyzerForDownload(downloaded.url, downloaded.contentType);
+      if (!analyzer) {
+        try {
+          const sniffed = await classifyInput({
+            kind: "file",
+            value: downloaded.path,
+            displayName: path.basename(new URL(downloaded.url).pathname) || "payload",
+            mimeType: downloaded.contentType,
+            sizeBytes: downloaded.sizeBytes,
+            cleanup: async () => undefined,
+          });
+          analyzer = isFileAnalyzer(sniffed.classification.analyzer)
+            ? sniffed.classification.analyzer
+            : "malware";
+        } catch (error) {
+          logger?.warn(
+            {
+              runId,
+              event: "payload_download",
+              status: "failed",
+              host: safeHost(candidate),
+              error: error instanceof Error ? error.message : String(error),
+            },
+            "payload classification failed",
+          );
+          continue;
+        }
+      }
+
+      let filePath: string;
+      try {
+        filePath = await ensureAnalyzerFileExtension(downloaded.path, analyzer);
+      } catch (error) {
+        logger?.warn(
+          {
+            runId,
+            event: "payload_download",
+            status: "failed",
+            host: safeHost(candidate),
+            error: error instanceof Error ? error.message : String(error),
+          },
+          "payload extension normalization failed",
+        );
+        continue;
+      }
+
+      const target: AnalysisTarget = {
+        id: makeTargetId("file", filePath),
+        kind: "file",
+        value: filePath,
+        displayName: payloadDisplayName(downloaded.url, analyzer),
+        origin: "payload_download",
+        mimeType: downloaded.contentType,
+        sizeBytes: downloaded.sizeBytes,
+        sourceUrl: candidate,
+      };
+      const action: AnalysisAction = {
+        tool: ANALYZER_TOOL[analyzer],
+        targetId: target.id,
+        reasoning: `Downloaded a payload from ${safeHost(candidate)} and selected ${analyzer} based on its content type and filename.`,
+      };
+
+      logger?.info(
+        {
+          runId,
+          event: "payload_download",
+          status: "selected",
+          host: safeHost(candidate),
+          analyzer,
+          contentType: downloaded.contentType,
+          sizeBytes: downloaded.sizeBytes,
+          targetId: target.id,
+        },
+        "payload selected for analysis",
+      );
+
+      return { action, target };
+    }
+
+    return null;
+  }
 
   const toolDescriptions: Record<string, string> = {};
   for (const name of tools.names()) {
@@ -335,6 +508,15 @@ export function buildAnalysisGraph(options: AnalysisGraphOptions) {
     }
 
     if (validation.action === null) {
+      const payload = await nextPayloadAction(state);
+      if (payload) {
+        return {
+          targets: [payload.target],
+          pendingAction: payload.action,
+          counters,
+        };
+      }
+
       logger?.info(
         {
           runId,

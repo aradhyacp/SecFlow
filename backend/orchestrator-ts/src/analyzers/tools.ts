@@ -22,7 +22,7 @@ import { WebAnalyzerClient } from "./clients/web.js";
 const ALLOWED_TARGET_KINDS: Record<AnalysisToolName, readonly TargetKind[]> = {
   analyze_malware: ["file"],
   analyze_steg: ["file"],
-  analyze_recon: ["ip", "domain", "email", "phone", "username"],
+  analyze_recon: ["ip", "domain", "email", "phone", "username", "unknown"],
   analyze_web: ["url"],
   analyze_macro: ["file"],
 };
@@ -33,7 +33,7 @@ const TOOL_DESCRIPTIONS: Record<AnalysisToolName, string> = {
   analyze_steg:
     "Analyze an image file target for hidden or embedded data using the steg-analyzer tool set. Use only for image file targets. Pass a targetId from the target catalog; never pass a path.",
   analyze_recon:
-    "Run threat-intelligence reconnaissance (/scan) for an IP or domain, or OSINT footprint (/footprint) for an email, phone number, or username. Use when the target is one of those indicators or when findings expose one. Pass a targetId from the target catalog; never pass a raw value.",
+    "Run threat-intelligence reconnaissance (/scan) for an IP or domain, or OSINT footprint (/footprint) for an email, phone number, username, or an unknown string that may be a username. Use when the target is one of those indicators or when findings expose one. Pass a targetId from the target catalog; never pass a raw value.",
   analyze_web:
     "Analyze an HTTP or HTTPS URL: reachability, security headers, TLS/SSL, HSTS, WAF, redirects, DNS, and malware/phishing checks. Use only for URL targets. Pass a targetId from the target catalog; never pass a URL directly.",
   analyze_macro:
@@ -89,11 +89,26 @@ export function createAnalyzerTool(deps: AnalyzerToolDependencies) {
       await deps.guard?.assertTargetAllowed(target);
 
       const adapted = await deps.run(target, context);
+      // Downloaded payloads always carry provenance evidence, even if the
+      // analyzer finds nothing; this mirrors the Python pipeline.
+      const findings: SecFlowFinding[] = target.sourceUrl
+        ? [
+            {
+              type: "payload_downloaded",
+              detail:
+                `File downloaded from: ${target.sourceUrl}. ` +
+                "Treat as inherently suspicious regardless of analysis results.",
+              severity: "high",
+              evidence: target.sourceUrl,
+            },
+            ...adapted.findings,
+          ]
+        : adapted.findings;
       const secFlow = secFlowResultSchema.parse({
         analyzer: deps.analyzer,
         pass: context.pass,
         input: target.displayName,
-        findings: adapted.findings,
+        findings,
         risk_score: adapted.riskScore,
         raw_output: adapted.rawOutput,
         ...(adapted.extractedFiles ? { extracted_files: adapted.extractedFiles } : {}),
@@ -107,8 +122,8 @@ export function createAnalyzerTool(deps: AnalyzerToolDependencies) {
 
       const summary = truncate(
         [
-          `${deps.analyzer} analysis of ${target.displayName}: ${adapted.findings.length} finding(s), risk ${adapted.riskScore.toFixed(1)}.`,
-          summarizeFindings(adapted.findings, 8),
+          `${deps.analyzer} analysis of ${target.displayName}: ${findings.length} finding(s), risk ${adapted.riskScore.toFixed(1)}.`,
+          summarizeFindings(findings, 8),
           "Full output is referenced by rawOutputRef; it is not included in this message.",
         ].join("\n"),
         4_000,
@@ -118,9 +133,9 @@ export function createAnalyzerTool(deps: AnalyzerToolDependencies) {
         analyzer: deps.analyzer,
         pass: context.pass,
         targetId: target.id,
-        findings: conciseFindings(adapted.findings),
+        findings: conciseFindings(findings),
         riskScore: adapted.riskScore,
-        findingCount: adapted.findings.length,
+        findingCount: findings.length,
         summary,
         rawOutputRef,
         extractedFiles: adapted.extractedFiles ?? [],

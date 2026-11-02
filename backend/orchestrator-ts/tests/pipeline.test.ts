@@ -8,6 +8,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { loadConfig } from "../src/config.js";
 import { createLogger } from "../src/logger.js";
 import { createAnalysisRunner, type RunnerDependencies } from "../src/pipeline/index.js";
+import type { PayloadDownloader } from "../src/pipeline/payloadDownloader.js";
 import type { AnalysisRequest, ResolvedInput } from "../src/pipeline/types.js";
 import { SsrfBlockedError } from "../src/security/networkGuard.js";
 import { choose, finish, ScriptedDecisionModel } from "./helpers/decisionModel.js";
@@ -53,6 +54,7 @@ function request(input: ResolvedInput, signal = AbortSignal.timeout(30_000)): An
 function dependencies(model: ScriptedDecisionModel, overrides: Partial<RunnerDependencies> = {}) {
   const fake = createFakeAnalyzerRegistry(() => findingSet("country=US, ISP=Example"));
   return {
+    payloadDownloader: null,
     ...overrides,
     model,
     analyzerRegistry: fake.registry,
@@ -150,6 +152,29 @@ describe("production analysis runner", () => {
     expect(fake.calls).toHaveLength(1);
   });
 
+  it("cleans up run-scoped payload downloads after the run", async () => {
+    const config = await makeConfig();
+    const model = new ScriptedDecisionModel([finish()]);
+    let cleanupCalls = 0;
+    const downloader: PayloadDownloader = {
+      async download() {
+        throw new Error("no download should occur in this test");
+      },
+      async cleanup() {
+        cleanupCalls += 1;
+      },
+    };
+    const runner = createAnalysisRunner(
+      config,
+      createLogger(config),
+      dependencies(model, { payloadDownloader: downloader }),
+    );
+
+    await runner.run(request(targetInput("8.8.8.8")));
+
+    expect(cleanupCalls).toBe(1);
+  });
+
   it("blocks an SSRF target before any analyzer executes", async () => {
     const config = await makeConfig();
     const model = new ScriptedDecisionModel([]);
@@ -191,6 +216,7 @@ describe("production analysis runner", () => {
       model,
       analyzerRegistry: fake.registry,
       reportModel: null,
+      payloadDownloader: null,
     });
 
     const result = await runner.run(request(targetInput("https://start.example")));

@@ -16,16 +16,18 @@ Each analyzer is an **independent Docker microservice**. The Orchestrator never 
 | Web Vulnerability | `web-analyzer` | 5005 | JSON `{"url": "..."}` |
 | Macro / Office | `macro-analyzer` | 5006 | `multipart/form-data` file |
 
-Each service returns its own native JSON. An **adapter** inside the Orchestrator (`orchestrator/app/adapters/<name>_adapter.py`) translates that into the SecFlow contract:
+Each service returns its own native JSON. An **adapter** inside the TypeScript
+orchestrator (`orchestrator-ts/src/analyzers/adapters/<name>.ts`) translates
+that into the SecFlow contract:
 
-```python
+```ts
 {
-    "analyzer":   str,         # "malware" | "steg" | "recon" | "web" | "macro"
-    "pass":       int,         # 1-indexed loop pass number
-    "input":      str,         # the exact value passed in
-    "findings":   list[dict],  # normalised finding objects
-    "risk_score": float,       # aggregate risk for this pass, 0.0–10.0
-    "raw_output": str          # full text output (AI reads this for IOC extraction)
+    analyzer: "malware" | "steg" | "recon" | "web" | "macro",
+    pass: number,              // 1-indexed loop pass number
+    input: string,             // the exact value passed in
+    findings: Finding[],       // normalised finding objects
+    risk_score: number,        // aggregate risk for this pass, 0.0–10.0
+    raw_output: string         // bounded evidence retained for decisions/report
 }
 ```
 
@@ -49,7 +51,7 @@ Analyzer services must **never crash the Orchestrator**. The adapter wraps all H
 **Docker service:** `malware-analyzer`  
 **Host port:** 5001 → container port 5000  
 **Base image:** `eclipse-temurin:21-jdk-jammy` (JDK 21 required for Ghidra JVM)  
-**Adapter:** `orchestrator/app/adapters/malware_adapter.py`
+**Adapter:** `orchestrator-ts/src/analyzers/adapters/malware.ts`
 
 ### Real Endpoints
 
@@ -109,7 +111,7 @@ raw = {"vt": <file-analysis resp>, "decompile": <decompile resp>}
 **Source:** `backend/Steg-Analyzer/`  
 **Docker service:** `steg-analyzer`  
 **Host port:** 5002 → container port 5000  
-**Adapter:** `orchestrator/app/adapters/steg_adapter.py`
+**Adapter:** `orchestrator-ts/src/analyzers/adapters/steg.ts`
 
 ### Real Endpoints
 
@@ -160,7 +162,7 @@ The Steg Analyzer runs with PostgreSQL (`steg-postgres`) + Redis (`steg-redis`) 
 **Docker service:** `recon-analyzer`  
 **Host port:** 5003 → container port 5000  
 **API prefix:** `/api/Recon-Analyzer` (capital R and A — exact)
-**Adapter:** `orchestrator/app/adapters/recon_adapter.py`
+**Adapter:** `orchestrator-ts/src/analyzers/adapters/recon.ts`
 
 ### Real Endpoints
 
@@ -216,7 +218,7 @@ requests.post(f"{_RECON_BASE}/footprint", json={"query": email_or_username}, tim
 **Source:** `backend/Web-Analyzer/`  
 **Docker service:** `web-analyzer`  
 **Host port:** 5005 → container port 5000  
-**Adapter:** `orchestrator/app/adapters/web_adapter.py`
+**Adapter:** `orchestrator-ts/src/analyzers/adapters/web.ts`
 
 ### Real Endpoint
 
@@ -242,7 +244,7 @@ requests.post(f"{_RECON_BASE}/footprint", json={"query": email_or_username}, tim
 **Source:** `backend/macro-analyzer/`  
 **Docker service:** `macro-analyzer`  
 **Host port:** 5006 → container port 5000  
-**Adapter:** `orchestrator/app/adapters/macro_adapter.py`
+**Adapter:** `orchestrator-ts/src/analyzers/adapters/macro.ts`
 
 ### Real Endpoints
 
@@ -307,27 +309,30 @@ If VirusTotal confirms malicious hits, risk score is raised: 1+ detections → m
 | `av_detection` | Per-engine AV detection (up to 10) |
 | `payload_downloaded` | Always shown when file was fetched from a URL |
 
-Each service returns its own native JSON. An **adapter** inside the Orchestrator (`orchestrator/app/adapters/<name>_adapter.py`) translates that into the SecFlow contract:
+Each service returns its own native JSON. An **adapter** inside the Orchestrator (`orchestrator-ts/src/analyzers/adapters/<name>.ts`) translates that into the SecFlow contract:
 
-```python
+```ts
 {
-    "analyzer": str,         # "malware" | "steg" | "recon" | "url" | "web"
-    "pass": int,             # 1-indexed loop pass number
-    "input": str,            # the exact value passed in
-    "findings": list[dict],  # see per-analyzer finding format below
-    "risk_score": float,     # aggregate risk for this pass, 0.0–10.0
-    "raw_output": str        # concatenated raw tool output (for AI consumption)
+    analyzer: "malware" | "steg" | "recon" | "web" | "macro",
+    pass: number,              // 1-indexed loop pass number
+    input: string,             // the exact value passed in
+    findings: Finding[],       // see per-analyzer finding format below
+    risk_score: number,        // aggregate risk for this pass, 0.0–10.0
+    raw_output: string         // bounded raw output retained for evidence
 }
 ```
 
-Analyzer services must **never crash the Orchestrator**. The adapter must wrap the HTTP call in try/except and return an error-shaped finding dict if the service is unreachable or returns a non-200 response.
+Analyzer services must **never crash the Orchestrator**. The TypeScript HTTP
+client maps unreachable services and non-200 responses to typed analyzer
+errors; the graph records a structured tool error and continues when other
+evidence remains.
 
 ---
 
 ## 1. Malware Analyzer
 
 **Service:** `backend/malware-analyzer/` — `POST http://malware-analyzer:5001/api/malware-analyzer/`
-**Adapter:** `orchestrator/app/adapters/malware_adapter.py`
+**Adapter:** `orchestrator-ts/src/analyzers/adapters/malware.ts`
 
 ### Purpose
 Detect malicious characteristics in executables, PE binaries, and extracted binary payloads.
@@ -375,7 +380,7 @@ Detect malicious characteristics in executables, PE binaries, and extracted bina
 ## 2. Steganography Analyzer
 
 **Service:** `backend/steg-analyzer/` — `POST http://steg-analyzer:5002/api/steg-analyzer/`
-**Adapter:** `orchestrator/app/adapters/steg_adapter.py`
+**Adapter:** `orchestrator-ts/src/analyzers/adapters/steg.ts`
 
 ### Purpose
 Detect and extract hidden data embedded within image files using steganographic or watermarking techniques.
@@ -424,7 +429,7 @@ Detect and extract hidden data embedded within image files using steganographic 
 ## 3. Reconnaissance Analyzer
 
 **Service:** `backend/recon-analyzer/` — `POST http://recon-analyzer:5003/api/recon-analyzer/`
-**Adapter:** `orchestrator/app/adapters/recon_adapter.py`
+**Adapter:** `orchestrator-ts/src/analyzers/adapters/recon.ts`
 
 ### Purpose
 Gather OSINT and infrastructure intelligence on IPs, domains, and hostnames.
@@ -476,7 +481,7 @@ Gather OSINT and infrastructure intelligence on IPs, domains, and hostnames.
 ## 4. Web Vulnerability Analyzer
 
 **Service:** `backend/web-analyzer/` — `POST http://web-analyzer:5005/api/web-analyzer/`
-**Adapter:** `orchestrator/app/adapters/web_adapter.py`
+**Adapter:** `orchestrator-ts/src/analyzers/adapters/web.ts`
 
 ### Purpose
 Analyze URLs and web endpoints for vulnerabilities, misconfigurations, and security weaknesses.
@@ -545,7 +550,7 @@ The Report Generator computes an **overall risk score** as the maximum risk scor
 
 1. Create a new Docker service directory under `backend/<name>-analyzer/` with its own `Dockerfile` and `requirements.txt`.
 2. Add the service to `backend/compose.yml` on the `secflow-net` network.
-3. Create `orchestrator/app/adapters/<name>_adapter.py` to translate the service's native response into the SecFlow contract.
-4. Add the analyzer name to the routing rules in `orchestrator/app/classifier/rules.py`.
-5. Add the analyzer name to the available tools list in `orchestrator/app/ai/engine.py`.
+3. Create `orchestrator-ts/src/analyzers/adapters/<name>.ts` to translate the service's native response into the SecFlow contract.
+4. Add the analyzer name to `src/config.ts` `ANALYZER_NAMES`, the endpoint env map, and the classifier rules in `src/classifier/rules.ts`.
+5. Add its validated tool to `src/analyzers/tools.ts` and the graph action schema in `src/graph/schema/tools.ts`.
 6. Document the service and its endpoint in this file.

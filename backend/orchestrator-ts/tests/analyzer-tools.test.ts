@@ -25,6 +25,7 @@ let server: TestServer;
 let tempDir: string;
 let registry: ReturnType<typeof createAnalyzerToolRegistry>;
 let fileTarget: AnalysisTarget;
+let payloadTarget: AnalysisTarget;
 let imageTarget: AnalysisTarget;
 let macroTarget: AnalysisTarget;
 let ipTarget: AnalysisTarget;
@@ -127,6 +128,12 @@ beforeAll(async () => {
     displayName: "sample.bin",
     origin: "user_input",
   };
+  payloadTarget = {
+    ...fileTarget,
+    id: makeTargetId("file", `${binaryPath}#downloaded`),
+    origin: "payload_download",
+    sourceUrl: "https://payload.example/dropper.exe",
+  };
   imageTarget = {
     id: makeTargetId("file", imagePath),
     kind: "file",
@@ -215,6 +222,25 @@ describe("analyzer tools against a fixture-backed HTTP service", () => {
     const modelProjection = registry.toModelOutput("analyze_malware", result.output);
     expect(modelProjection).toEqual(parsed.modelOutput);
     expect(modelProjection).not.toHaveProperty("secFlow");
+  });
+
+  it("prepends payload provenance without changing the analyzer risk score", async () => {
+    const result = await registry.execute(
+      "analyze_malware",
+      { targetId: payloadTarget.id },
+      context([payloadTarget]),
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const parsed = analyzerToolResultSchema.parse(result.output);
+    expect(parsed.secFlow.findings[0]).toMatchObject({
+      type: "payload_downloaded",
+      severity: "high",
+      evidence: "https://payload.example/dropper.exe",
+    });
+    expect(parsed.secFlow.findings).toHaveLength(12);
+    expect(parsed.secFlow.risk_score).toBe(10);
   });
 
   it("runs the steg tool through upload → status → result", async () => {

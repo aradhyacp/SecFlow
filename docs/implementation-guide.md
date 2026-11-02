@@ -1,6 +1,13 @@
 # SecFlow — Implementation Guide
 
-This guide documents the current implementation of SecFlow: key patterns, code structure, and how the pipeline actually works in practice.
+> **Historical note:** this guide describes the pre-migration Python/Groq
+> orchestrator. The active orchestrator is the TypeScript/LangGraph service in
+> `backend/orchestrator-ts/`; see
+> [ts-migration/11-cutover.md](ts-migration/11-cutover.md) and
+> [architecture.md](architecture.md) for the current implementation. The
+> analyzer service APIs documented below are still accurate.
+
+This guide documents the implementation of SecFlow: key patterns, code structure, and how the pipeline actually works in practice.
 
 ---
 

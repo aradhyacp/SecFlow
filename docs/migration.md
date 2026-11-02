@@ -1,4 +1,10 @@
-# SecFlow — AI Model Migration: Gemini → Groq
+# SecFlow — AI Model Migration History: Gemini → Groq → OpenRouter
+
+> **Historical note:** the Groq orchestrator has been retired. The active
+> orchestrator is TypeScript/LangGraph and uses OpenRouter
+> (`OPENROUTER_MODEL`, default `nvidia/nemotron-3-ultra-550b-a55b:free`). See
+> [ts-migration/11-cutover.md](ts-migration/11-cutover.md). The analyzer
+> services and their optional Gemini endpoints are unchanged.
 
 This document covers the history of SecFlow's AI integration, why the team migrated from Google Gemini to Groq, and what changed technically.
 

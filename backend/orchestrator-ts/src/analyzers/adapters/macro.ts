@@ -29,7 +29,7 @@ const INDICATOR_SEVERITY: Record<string, SecFlowFinding["severity"]> = {
 
 /**
  * Translate a macro-analyzer /analyze response into the SecFlow contract.
- * Mirrors backend/orchestrator/app/adapters/macro_adapter.py.
+ * Ports the retired Python macro adapter.
  */
 export function adaptMacro(rawValue: unknown, inputDisplayName = "unknown"): AdaptedAnalyzerResult {
   const raw = asRecord(rawValue);

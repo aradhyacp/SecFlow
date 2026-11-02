@@ -1,5 +1,11 @@
 # SecFlow — System Architecture
 
+SecFlow runs one **TypeScript/Node.js orchestrator** built on a single
+**LangGraph.js** state graph, plus five independent **Python analyzer
+microservices**. The analyzers keep their own REST APIs and are called over the
+Docker network; there is no direct code import between the orchestrator and the
+analyzers.
+
 ---
 
 ## High-Level Component Diagram
@@ -10,142 +16,147 @@
  │                                                                              │
  │  ┌─────────────┐   POST /api/smart-analyze                                  │
  │  │  User /     │──────────────────────────────────────────────────────┐     │
- │  │  Frontend   │                                                      │     │
- │  └─────────────┘                                                      ▼     │
+ │  │  Frontend   │                                                      ▼     │
+ │  └─────────────┘                                                      │     │
  │                              ┌──────────────────────────────────────────┐   │
- │                              │   Orchestrator Service  (port 5000)      │   │
+ │                              │  orchestrator-ts (port 5000)             │   │
+ │                              │  Express + LangGraph.js + OpenRouter     │   │
  │                              │                                          │   │
  │                              │  ┌──────────────────────────────────┐   │   │
- │                              │  │  Input Classifier                │   │   │
- │                              │  │  (file cmd + python-magic)       │   │   │
+ │                              │  │  Classifier (magic bytes/rules)  │   │   │
  │                              │  └──────────────┬───────────────────┘   │   │
- │                              │                 │  first analyzer        │   │
+ │                              │                 │ deterministic first   │   │
  │                              │  ┌──────────────▼───────────────────┐   │   │
- │                              │  │  AI Decision Engine (Gemini)     │   │   │
- │                              │  │  engine.py + keywords.txt        │   │   │
- │                              │  └──────────────┬───────────────────┘   │   │
- │                              │                 │  next_tool             │   │
- │                              │  ┌──────────────▼───────────────────┐   │   │
- │                              │  │  Pipeline Loop (orchestrator.py) │   │   │
- │                              │  └──────────────┬───────────────────┘   │   │
- │                              │                 │  HTTP calls             │   │
- │                              └─────────────────┼─────────────────────────┘   │
- │                                                │                             │
- │              ┌─────────────────────────────────┴──────────────┐             │
- │              │          Analyzer Services (Docker network)     │             │
- │              │                                                 │             │
- │    ┌─────────▼────────┐  ┌──────────────────┐  ┌─────────────▼──────────┐  │
- │    │ malware-analyzer │  │  steg-analyzer   │  │    recon-analyzer      │  │
- │    │   port 5001      │  │   port 5002      │  │      port 5003         │  │
- │    └──────────────────┘  └──────────────────┘  └────────────────────────┘  │
- │                                                                              │
- │    ┌──────────────────┐  ┌──────────────────┐                               │
- │    │  url-analyzer    │  │  web-analyzer    │                               │
- │    │  port 5004       │  │   port 5005      │                               │
- │    │  (internal only) │  └──────────────────┘                               │
- │    └──────────────────┘                                                     │
- │                                                                              │
- │              ┌──────────────────────────────────────────────────────────┐   │
- │              │   Back inside Orchestrator after each analyzer call      │   │
- │              │                                                          │   │
- │              │  Adapter fn (malware/steg/recon/web_adapter.py)          │   │
- │              │    → normalize response → SecFlow contract dict          │   │
- │              │  Findings Store (findings_store.py)                      │   │
- │              │    → append(finding)                                     │   │
- │              └──────────────────────────────────────────────────────────┘   │
- │                                                                              │
- │              ┌──────────────────────────────────────────────────────────┐   │
- │              │   Report Generator (end of loop)                        │   │
- │              │   Findings Store → Gemini AI → JSON / PDF / HTML        │   │
- │              └──────────────────────────────────────────────────────────┘   │
+ │                              │  │  Analysis graph                  │   │   │
+ │                              │  │  decision → tool → decision ...  │   │   │
+ │                              │  └──────┬───────────────┬───────────┘   │   │
+ │                              │         │ HTTP          │ finish         │   │
+ │                              │  ┌──────▼──────┐  ┌─────▼───────────┐   │   │
+ │                              │  │ Analyzer    │  │ YARA-X / SIGMA  │   │   │
+ │                              │  │ tool layer  │  │ report stage    │   │   │
+ │                              │  └──────┬──────┘  └─────────────────┘   │   │
+ │                              └─────────┼─────────────────────────────────┘   │
+ │                                        │                                     │
+ │              ┌─────────────────────────┴────────────────────────────┐        │
+ │              │          Analyzer Services (Docker network)          │        │
+ │    ┌─────────▼────────┐  ┌──────────────────┐  ┌─────────────▼──────┐ │        │
+ │    │ malware-analyzer │  │  steg-analyzer   │  │   recon-analyzer   │ │        │
+ │    │   port 5001      │  │   port 5002      │  │     port 5003      │ │        │
+ │    └──────────────────┘  └──────────────────┘  └────────────────────┘ │        │
+ │    ┌──────────────────┐  ┌──────────────────┐                         │        │
+ │    │   web-analyzer   │  │  macro-analyzer  │                         │        │
+ │    │   port 5005      │  │   port 5006      │                         │        │
+ │    └──────────────────┘  └──────────────────┘                         │        │
+ │              └────────────────────────────────────────────────────────┘        │
  └──────────────────────────────────────────────────────────────────────────────┘
 ```
 
----
-
-## Component Descriptions
-
-### Orchestrator Service (NEW — port 5000)
-- **What it is:** A new Flask microservice, the only net-new code in SecFlow.
-- **Exposes:** `POST /api/smart-analyze`
-- **Contains:** Input Classifier, AI Decision Engine, Adapters, Findings Store, Report Generator — all as internal modules.
-- **How it calls analyzers:** Via HTTP to Docker-internal service URLs (e.g., `http://malware-analyzer:5001/api/malware-analyzer/`). Docker Compose resolves service names.
-
-### Input Classifier
-- **Role:** Determines input type and selects the first analyzer. Lives inside the Orchestrator service.
-- **Primary method:** `file` command (system) + `python-magic` (Python library).
-- **Output:** One of `[ "malware", "steg", "recon", "web", "url", "unknown" ]`.
-- **Fallback:** Passes `file`/`python-magic` output plus `head -100` of the file to the AI Decision Engine when type is `"unknown"`.
-
-### AI Decision Engine
-- **Role:** AI router. Given the output of the most recent analyzer, returns the next analyzer name or a termination signal. Lives inside the Orchestrator service.
-- **Model:** Google Gemini (tool-calling mode).
-- **Fallback strategy:**
-  1. Pass analyzer's `raw_output` to Gemini → get `next_tool`.
-  2. If output too large → grep `keywords.txt` matches → pass matched lines to Gemini.
-  3. If still unclear → pass full output (truncated to 4000 chars).
-- **Output:** `{ "next_tool": str | null, "reasoning": str }`.
-
-### Adapters
-- **Role:** Translation layer between each analyzer's native response format and the SecFlow findings contract.
-- **Location:** `orchestrator/app/adapters/<name>_adapter.py` — one per analyzer.
-- **Why they exist:** Analyzer services return their own JSON shapes. Adapters absorb format differences without touching analyzer code.
-
-### Analyzer Services (5 containers)
-Each is an independent Docker microservice called by the Orchestrator via HTTP POST.
-
-| Service | Port | Transport | Input |
-|---|---|---|---|
-| `malware-analyzer` | 5001 | `multipart/form-data` | EXE / binary file |
-| `steg-analyzer` | 5002 | `multipart/form-data` | Image file |
-| `recon-analyzer` | 5003 | `application/json` `{"target": "ip_or_domain"}` | IP / domain |
-| `url-analyzer` | 5004 | `application/json` `{"url": "..."}` | URL (internal only) |
-| `web-analyzer` | 5005 | `application/json` `{"url": "..."}` | URL |
-
-### Findings Store
-- **Role:** Append-only accumulator for all adapter-normalized outputs across all loop passes. Lives inside the Orchestrator service.
-- **Interface:** `append(finding: dict)`, `get_all() -> list[dict]`, `to_json() -> str`.
-- **Persistence:** In-memory during a pipeline run; serialized to disk as `findings.json` after completion.
-
-### Report Generator
-- **Role:** Takes the full Findings Store, formats via Gemini into a PWNDoc report. Lives inside the Orchestrator service.
-- **Output formats:** JSON, PDF (fpdf2), HTML (Jinja2).
-- **Validates** Gemini-formatted output against `pwndoc_schema.json` before writing.
+The steg service also brings its own PostgreSQL, Redis, initialiser, and RQ
+worker containers. Those are implementation details of that analyzer and are not
+part of the orchestrator contract.
 
 ---
 
-## Data Flow Summary
+## Components
+
+### Orchestrator (`backend/orchestrator-ts/`)
+
+- **Entry point:** `src/index.ts`, Express on port `5000`.
+- **API:** `POST /api/smart-analyze`, `GET /api/health`, `GET /api/ready`,
+  `GET /api/report/:jobId/:fmt`.
+- **Graph:** `src/graph/analysis.ts` builds the LangGraph state machine.
+  `src/graph/finalize.ts` runs YARA, SIGMA, and the report stage after the loop.
+- **Model access:** `src/model/` wraps OpenRouter through the Vercel AI SDK.
+  The model chooses from a schema-validated action list; it cannot supply
+  arbitrary URLs, paths, or commands.
+- **Runner:** `src/pipeline/index.ts` creates run-scoped tools/loggers, hashes
+  the input for the stable job id, enforces the total deadline, cleans up
+  temporary files, and maps errors to HTTP responses.
+
+### Input Classifier (`src/classifier/`)
+
+- File input is identified from magic bytes (`sniff.ts`), MIME hints, and
+  extension (`rules.ts`).
+- String input uses the existing URL, IPv4, domain, email, and phone regexes.
+- URL is checked before domain, so `https://example.com` routes to web analysis.
+- Deterministic matches avoid a model call on pass 1. Unknown input exposes the
+  appropriate tools and includes a bounded, untrusted file-head preview.
+
+### Analyzer Adapters and Tools (`src/analyzers/`)
+
+Each analyzer has:
+
+- a typed HTTP client with timeouts, bounded responses, and retries;
+- an adapter that normalises the native response into the SecFlow contract;
+- a validated tool (`analyze_malware`, etc.) that accepts only a trusted
+  `targetId`.
+
+Native analyzer endpoints are unchanged:
+
+| Analyzer | Internal base URL | Request |
+|---|---|---|
+| malware | `http://malware-analyzer:5000/api/malware-analyzer` | multipart; `/decompile` + `/file-analysis` |
+| steg | `http://steg-analyzer:5000/api/steg-analyzer` | multipart; async upload/poll |
+| recon | `http://recon-analyzer:5000/api/Recon-Analyzer` | JSON `{"query": "..."}` |
+| web | `http://web-analyzer:5000/api/web-analyzer` | JSON `{"url": "..."}` |
+| macro | `http://macro-analyzer:5000/api/macro-analyzer` | multipart; `/analyze` |
+
+### Findings State and Evidence
+
+- `src/graph/state.ts` holds the validated graph state: targets, findings,
+  counters, tool history, errors, rules, and report state.
+- `src/graph/rawOutputStore.ts` stores bounded raw evidence. The model receives
+  references and excerpts, not unbounded decompiler/VT dumps or sample bytes.
+- Every analyzer result preserves pass order and analyzer identity.
+
+### Rules and Report Stages (`src/rules/`, `src/report/`)
+
+- YARA rules are requested with evidence citations, then **compiled with
+  YARA-X WASM** before being accepted.
+- SIGMA rules are schema-checked and structurally validated.
+- The report stage emits PWNDoc-compatible JSON and a self-contained HTML
+  report with an export-to-PDF button. Optional narrative text uses the same
+  OpenRouter model.
+- Files are written under `REPORTS_DIR/<16-hex job id>/`.
+
+### Security Boundaries
+
+- `src/security/networkGuard.ts` blocks loopback, private, link-local, metadata,
+  reserved, and internal destinations for URL/IP/domain targets and for every
+  payload-download redirect hop.
+- Analyzer base URLs come only from operator-controlled environment variables.
+- Temporary uploads and downloaded payloads are removed after the run.
+- Logs are structured JSON with API keys and authorization headers redacted.
+
+---
+
+## Data Flow
 
 ```
-User POST /api/smart-analyze
-  → Orchestrator (port 5000)
-      → Classifier (pass 1 only, no AI)
-          [rule match]  → HTTP POST → Analyzer Service
-          [unknown]     → AI Engine → Analyzer Service
-
-      Loop (pass 2..N):
-        HTTP POST → Analyzer Service → raw response
-        → Adapter → SecFlow contract dict
-        → Findings Store.append()
-        → AI Engine → next_tool (or null → break)
-
-      End of loop:
-        Findings Store.to_json() → Report Generator
-        → Gemini AI → PWNDoc → JSON + PDF + HTML
+POST /api/smart-analyze
+  → validate passes, resolve upload/target
+  → classify input
+      deterministic rule → first analyzer tool
+      unknown input      → model chooses an available tool
+  → graph loop:
+      model decision (action + targetId + reasoning)
+        → analyzer tool over HTTP → adapter → findings + evidence
+        → repeat until pass limit, finish, or budget/deadline
+  → optional guarded payload download from latest evidence
+  → YARA-X + SIGMA + report stages
+  → JSON response with job_id, passes_completed, overall_risk_score,
+    findings_summary, report_paths, report_urls
 ```
+
+The frontend contract is unchanged: it still submits to
+`http://localhost:5000/api/smart-analyze` and reads `job_id`,
+`findings_summary`, `overall_risk_score`, and `report_urls`.
 
 ---
 
-## Docker Compose Network
+## Related Documentation
 
-All services communicate over a shared Docker bridge network (`secflow-net`). The Orchestrator reaches analyzers by Docker service name:
-
-| Orchestrator calls | Resolves to |
-|---|---|
-| `http://malware-analyzer:5001` | malware-analyzer container |
-| `http://steg-analyzer:5002` | steg-analyzer container |
-| `http://recon-analyzer:5003` | recon-analyzer container |
-| `http://url-analyzer:5004` | url-analyzer container |
-| `http://web-analyzer:5005` | web-analyzer container |
-
-Analyzer service URLs can be overridden via environment variables (`MALWARE_ANALYZER_URL`, etc.) for local development without Docker.
+- [pipeline-flow.md](pipeline-flow.md) — detailed loop and decision behavior
+- [analyzers.md](analyzers.md) — per-analyzer capabilities
+- [ts-migration/](ts-migration/) — migration record, parity results, and deviations
+- [../backend/Readme.md](../backend/Readme.md) — startup and deployment

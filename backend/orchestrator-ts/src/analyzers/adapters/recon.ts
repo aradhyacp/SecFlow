@@ -267,7 +267,7 @@ function adaptFootprint(rawValue: unknown): RawParts {
 
 /**
  * Translate a recon-analyzer /scan or /footprint response into the SecFlow
- * contract. Mirrors backend/orchestrator/app/adapters/recon_adapter.py.
+ * contract. Ports the retired Python recon adapter.
  */
 export function adaptRecon(raw: unknown, inputDisplayName: string): AdaptedAnalyzerResult {
   const record = asRecord(raw);

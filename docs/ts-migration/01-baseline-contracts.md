@@ -311,14 +311,14 @@ Fixtures: `docs/ts-migration/fixtures/` — `malware-file-analysis{,-clean}.json
 - [x] Replace Groq with OpenRouter via `@openrouter/ai-sdk-provider`; central provider module; `OPENROUTER_API_KEY` / `OPENROUTER_MODEL`.
 - [x] Port P1–P5 semantics (no Ghat prompt exists).
 - [x] Structured decision output (enumerated tool + validated args), not free-form JSON parsing.
-- [x] Deterministic fallback when the model fails, as today.
+- [x] Explicit termination when the model fails; prior findings are still available to the report. (No keyword-grep fallback; deviation reviewed in Step 11.)
 
 **Behaviour to keep**
 - [x] No AI on pass 1 when a deterministic rule matches.
 - [x] Artifact extraction + no-artifact early stop.
 - [x] Duplicate `(tool,target)` prevention.
 - [x] Opportunistic payload download with provenance finding (and SSRF guard — new, Step 10).
-- [x] Analyzer failures produce low-severity `error` findings, never exceptions.
+- [x] Analyzer failures never escape as exceptions. TypeScript records a structured tool error/history entry instead of Python's synthetic `error` finding (deviation reviewed in Step 11).
 
 **New requirements from the spec (not present today)**
 - [x] Zod schemas for every tool input/output.

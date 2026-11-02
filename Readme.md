@@ -6,10 +6,12 @@
 
 ### Fully Automated Multi-Vector Threat Analysis Pipeline
 
-[![Python](https://img.shields.io/badge/Python-3.11+-3776AB?style=flat-square&logo=python&logoColor=white)](https://python.org)
+[![TypeScript](https://img.shields.io/badge/Orchestrator-TypeScript-3178C6?style=flat-square&logo=typescript&logoColor=white)](https://typescriptlang.org)
+[![Node.js](https://img.shields.io/badge/Node.js-20%2B-339933?style=flat-square&logo=nodedotjs&logoColor=white)](https://nodejs.org)
+[![LangGraph](https://img.shields.io/badge/LangGraph.js-1.x-1C3C3C?style=flat-square&logo=langchain&logoColor=white)](https://langchain-ai.github.io/langgraphjs/)
+[![OpenRouter](https://img.shields.io/badge/AI-OpenRouter-6467F2?style=flat-square&logo=openai&logoColor=white)](https://openrouter.ai)
+[![Python analyzers](https://img.shields.io/badge/Analyzers-Python%203.11+-3776AB?style=flat-square&logo=python&logoColor=white)](https://python.org)
 [![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?style=flat-square&logo=docker&logoColor=white)](https://docker.com)
-[![Flask](https://img.shields.io/badge/Flask-3.0-000000?style=flat-square&logo=flask&logoColor=white)](https://flask.palletsprojects.com)
-[![Groq](https://img.shields.io/badge/AI-Groq%20%2B%20Qwen3-F55036?style=flat-square&logo=groq&logoColor=white)](https://groq.com)
 [![VirusTotal](https://img.shields.io/badge/VirusTotal-API%20v3-394EFF?style=flat-square&logo=virustotal&logoColor=white)](https://virustotal.com)
 [![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)](LICENSE)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen?style=flat-square)](https://github.com/aradhyacp/SecFlow/pulls)
@@ -31,7 +33,7 @@ SecFlow is an **open-source automated threat analysis pipeline** built for secur
 
 1. **Classifies** your input using deterministic rules (no AI on pass 1)
 2. **Routes** it through the right specialized analyzer via HTTP microservices
-3. **Reasons** about each pass's findings with Groq AI to decide the next step
+3. **Reasons** about each pass's findings with an OpenRouter model to decide the next step
 4. **Repeats** — following IOCs, downloading payloads, pivoting across analyzers
 5. **Reports** — generates a PWNDoc HTML report with YARA detection rules, SIGMA SIEM rules, MITRE ATT&CK mappings, and one-click PDF export
 
@@ -41,9 +43,9 @@ SecFlow is an **open-source automated threat analysis pipeline** built for secur
 
 | Feature | Detail |
 |---|---|
-| **AI-Driven Routing** | Groq `qwen/qwen3-32b` decides the next analyzer after each pass — no manual configuration |
+| **AI-Driven Routing** | OpenRouter `nvidia/nemotron-3-ultra-550b-a55b:free` decides the next analyzer after each pass — model is configurable |
 | **5 Specialized Analyzers** | Malware · Steganography · Reconnaissance · Web Vulnerability · Macro/Office |
-| **Smart First-Pass** | `file` + `python-magic` deterministic rules on pass 1 — AI only called when type is ambiguous |
+| **Smart First-Pass** | Deterministic file/target rules on pass 1 — AI is only called when the type is ambiguous |
 | **Download-and-Analyze** | Follows IOCs — downloads payloads found in raw output and routes them through the right analyzer |
 | **YARA Rule Generation** | Auto-generates 2–5 deployable YARA rules per analysis, each citing the exact evidence that drove it |
 | **SIGMA Rule Generation** | Auto-generates 2–4 SIGMA rules for Splunk / Elastic / Sentinel — covering different log sources |
@@ -63,8 +65,8 @@ User Input (file / URL / IP / domain / image)
         │
         ▼
 ┌────────────────────────────────┐
-│   Input Classifier             │  file + python-magic → deterministic rule
-│   (Rule-based, pass 1 only)    │  unknown type? → Groq AI fallback
+│   Input Classifier             │  deterministic type rules
+│   (Rule-based, pass 1 only)    │  unknown type? → OpenRouter fallback
 └───────────────┬────────────────┘
                 │  first analyzer selected
                 ▼
@@ -77,7 +79,7 @@ User Input (file / URL / IP / domain / image)
 │  └───────────────┬──────────────────────────────────┘  │
 │                  │ findings + raw_output                │
 │  ┌───────────────▼──────────────────────────────────┐  │
-│  │  AI Routing Engine  (Groq qwen/qwen3-32b)        │  │
+│  │  AI Routing Engine (LangGraph + OpenRouter)      │  │
 │  │  IOC extraction → next_tool + target             │  │
 │  └───────────────┬──────────────────────────────────┘  │
 │                  │                                      │
@@ -97,7 +99,7 @@ User Input (file / URL / IP / domain / image)
                 ▼
 ┌────────────────────────────────────────────┐
 │  Threat Intelligence Engine                │
-│  (Groq llama-3.3-70b-versatile)           │
+│  (OpenRouter · configurable model)        │
 │  ├─ Threat Summary + MITRE ATT&CK TTPs    │
 │  ├─ YARA Detection Rules (2–5 rules)      │
 │  └─ SIGMA SIEM Rules (2–4 rules)          │
@@ -105,7 +107,7 @@ User Input (file / URL / IP / domain / image)
                 │
                 ▼
 ┌────────────────────────────────┐
-│  PWNDoc HTML Report            │  Groq summary → browser-rendered HTML
+│  PWNDoc HTML Report            │  AI summary → browser-rendered HTML
 │                                │  One-click Export PDF button
 └────────────────────────────────┘
 ```
@@ -117,7 +119,8 @@ User Input (file / URL / IP / domain / image)
 ### Prerequisites
 
 - Docker + Docker Compose
-- API keys for Groq and VirusTotal (free tiers work)
+- An OpenRouter API key (the default model has a free tier)
+- A VirusTotal API key for malware/macro threat intelligence (optional but recommended)
 
 ### 1. Clone the repository
 
@@ -135,17 +138,20 @@ cp .env.example .env
 Edit `.env` with your keys:
 
 ```env
-# Required
-GROQ_API_KEY=your_groq_api_key_here
-VIRUSTOTAL_API_KEY=your_vt_api_key_here
+# Core keys
+OPENROUTER_API_KEY=your_openrouter_api_key_here     # Required
+VIRUSTOTAL_API_KEY=your_vt_api_key_here             # Recommended
 
 # Optional — unlock additional OSINT capabilities
 NUMVERIFY_API_KEY=your_numverify_key      # Phone number lookups
 THREATFOX_API_KEY=your_threatfox_key      # Higher ThreatFox rate limits
 ipAPI_KEY=your_ipapi_key                  # Higher ip-api.com rate limits
 
-# Pipeline control
-MAX_PASSES=3                              # 3 | 4 | 5
+# Orchestrator model + limits
+OPENROUTER_MODEL=nvidia/nemotron-3-ultra-550b-a55b:free
+MODEL_MAX_CYCLES=12
+TOTAL_ANALYSIS_TIMEOUT_MS=600000
+ALLOW_PRIVATE_TARGETS=false                # true only for local demos
 ```
 
 ### 3. Start all services
@@ -154,7 +160,7 @@ MAX_PASSES=3                              # 3 | 4 | 5
 docker compose up -d
 ```
 
-This starts 6 containers:
+This starts the six core services (plus Steg's PostgreSQL, Redis, and worker containers):
 
 | Service | Port | Role |
 |---|---|---|
@@ -310,13 +316,13 @@ See [`examples/`](examples/) for sample input files and [`example_reports`](exam
 ---
 
 ### Executive Summary
-AI-written narrative (Groq `qwen/qwen3-32b`) covering:
+AI-written narrative (OpenRouter model) covering:
 - Identified threat name and actor type classification
 - Attack chain reconstruction (step-by-step)
 - Confidence rating and overall risk score
 
 ### YARA Detection Rules
-**2–5 production-ready YARA rules** generated by `llama-3.3-70b-versatile`, each:
+**2–5 production-ready YARA rules** generated by the configured OpenRouter model and compiled with YARA-X, each:
 - Named with `SecFlow_[ThreatCategory]_[IndicatorType]` convention
 - Containing valid YARA 4.x syntax — ready to import into any YARA-compatible scanner
 - Including a `reasoning` field citing the exact evidence from the analysis that informed the rule
@@ -456,32 +462,25 @@ Report  ─ Executive summary + TTPs + SIGMA network rules
 ```
 SecFlow/
 ├── backend/
-│   ├── compose.yml                 # All 6 services on secflow-net
+│   ├── compose.yml                 # All services on secflow-net
 │   ├── .env.example                # All required + optional API keys
 │   │
-│   ├── orchestrator/               # Pipeline controller (port 5000)
-│   │   ├── app/
-│   │   │   ├── routes.py           # POST /api/smart-analyze
-│   │   │   ├── orchestrator.py     # Pipeline loop + download-and-analyze
-│   │   │   ├── classifier/
-│   │   │   │   ├── classifier.py   # file + python-magic type detection
-│   │   │   │   └── rules.py        # Deterministic routing rules
-│   │   │   ├── ai/
-│   │           ├── engine.py       # Groq qwen/qwen3-32b routing decisions
-│   │           ├── threat_intel.py # YARA rules + SIGMA rules + threat summary
-│   │   │   │   └── keywords.txt    # Grep fallback keyword list
-│   │   │   ├── adapters/           # Translate analyzer responses → contract
-│   │   │   │   ├── malware_adapter.py
-│   │   │   │   ├── steg_adapter.py
-│   │   │   │   ├── recon_adapter.py
-│   │   │   │   ├── web_adapter.py
-│   │   │   │   └── macro_adapter.py
-│   │   │   ├── store/
-│   │   │   │   └── findings_store.py   # Thread-safe findings accumulator
-│   │   │   └── reporter/
-│   │   │       └── report_generator.py # PWNDoc HTML + Export PDF
+│   ├── orchestrator-ts/            # TypeScript + LangGraph.js controller (port 5000)
+│   │   ├── src/
+│   │   │   ├── index.ts            # Express bootstrap + graceful shutdown
+│   │   │   ├── routes/             # /api/smart-analyze, /api/health, /api/report
+│   │   │   ├── classifier/         # Deterministic input classification + rules
+│   │   │   ├── graph/              # LangGraph state machine, decisions, loop
+│   │   │   ├── analyzers/          # HTTP clients, adapters, validated tools
+│   │   │   ├── pipeline/           # Runner, uploads, payload downloader
+│   │   │   ├── security/           # SSRF/network guard
+│   │   │   ├── rules/              # YARA-X + SIGMA generation/validation
+│   │   │   ├── report/             # PWNDoc report builder + narrative
+│   │   │   ├── prompts/            # Centralized, evidence-isolated prompts
+│   │   │   └── model/              # OpenRouter provider + LangGraph adapter
+│   │   ├── tests/                  # Unit, contract, parity and live-gated tests
 │   │   ├── Dockerfile
-│   │   └── requirements.txt
+│   │   └── package.json
 │   │
 │   ├── Malware-Analyzer/           # Ghidra + objdump + VirusTotal (port 5001)
 │   ├── Steg-Analyzer/              # binwalk + zsteg + steghide (port 5002)
@@ -510,30 +509,24 @@ SecFlow/
 
 ## AI Models
 
-SecFlow uses **Groq** for all AI inference — free tier, no credit card required.
+SecFlow uses **OpenRouter** for all orchestrator inference. The default model is
+`nvidia/nemotron-3-ultra-550b-a55b:free`; change `OPENROUTER_MODEL` to use a
+different tool-capable model without code changes.
 
 | Role | Model | Why |
 |---|---|---|
-| **Pipeline routing** | `qwen/qwen3-32b` | Reliable structured JSON output; `/no_think` mode skips chain-of-thought for fast routing decisions |
-| **Threat intelligence** | `llama-3.3-70b-versatile` | Stronger reasoning for YARA/SIGMA generation and MITRE TTP mapping |
-| **Report summary** | `qwen/qwen3-32b` | Executive summary + recommendations |
+| **Pipeline routing** | `OPENROUTER_MODEL` | Structured tool-calling decides the next analyzer after each pass |
+| **Threat intelligence** | `OPENROUTER_MODEL` | YARA/SIGMA generation and MITRE ATT&CK mapping |
+| **Report summary** | `OPENROUTER_MODEL` | Executive summary + recommendations |
 
-SecFlow uses the **OpenAI-compatible API spec** via the standard `openai` Python SDK — no vendor-specific SDK required. This means you can swap in any OpenAI-compatible model provider (OpenAI, Groq, Together, Ollama, etc.) by changing just the `base_url` and model name:
+The orchestrator calls OpenRouter through the Vercel AI SDK
+(`@openrouter/ai-sdk-provider` + `ai`) and runs the decision loop as a single
+LangGraph.js state graph. The analyzer microservices remain Python/Flask and are
+still invoked over their existing HTTP APIs. Set
+`OPENROUTER_API_KEY` in `backend/.env` before starting the stack.
 
-```python
-from openai import OpenAI
-
-# Groq (current — free tier)
-client = OpenAI(api_key=GROQ_API_KEY, base_url="https://api.groq.com/openai/v1")
-
-# OpenAI (drop-in swap)
-client = OpenAI(api_key=OPENAI_API_KEY)  # base_url defaults to api.openai.com
-
-# Local Ollama (fully offline)
-client = OpenAI(api_key="ollama", base_url="http://localhost:11434/v1")
-```
-
-**Why Groq + free tier?** SecFlow was built to be accessible — no paid API required to run the full pipeline. Groq's free tier covers all routing and report generation with no cost. If you're running heavier workloads or want to sponsor the project, see the [GitHub Sponsors](https://github.com/sponsors/aradhyacp) page.
+**Why OpenRouter?** One gateway exposes many tool-capable models, including free
+tiers, so SecFlow can switch models without changing the orchestration code.
 
 ---
 
@@ -577,12 +570,15 @@ Health check — returns `{"status": "healthy"}`.
 
 | Variable | Service | Required | Description |
 |---|---|---|---|
-| `GROQ_API_KEY` | orchestrator | ✅ | AI routing + threat intel + report generation |
-| `VIRUSTOTAL_API_KEY` | malware, macro | ✅ | VirusTotal API v3 file/URL analysis |
+| `OPENROUTER_API_KEY` | orchestrator | ✅ | AI routing + rule generation + report narrative |
+| `OPENROUTER_MODEL` | orchestrator | Optional | Model id (default `nvidia/nemotron-3-ultra-550b-a55b:free`) |
+| `VIRUSTOTAL_API_KEY` | malware, macro | Recommended | VirusTotal API v3 file/URL analysis |
 | `NUMVERIFY_API_KEY` | recon | Optional | Phone number validation (NumVerify) |
 | `THREATFOX_API_KEY` | recon | Optional | Higher rate limit on ThreatFox IOC queries |
 | `ipAPI_KEY` | recon | Optional | Higher rate limit on ip-api.com |
-| `MAX_PASSES` | orchestrator | Optional | Loop depth — `3` (default) / `4` / `5` |
+| `MODEL_MAX_CYCLES` | orchestrator | Optional | Maximum model decisions per run (default `12`) |
+| `TOTAL_ANALYSIS_TIMEOUT_MS` | orchestrator | Optional | Whole-run deadline (default `600000`) |
+| `ALLOW_PRIVATE_TARGETS` | orchestrator | Optional | Allow loopback/private targets (default `false`) |
 
 ---
 
@@ -650,6 +646,6 @@ If SecFlow helps you, give it a star — it helps others discover the project.
 
 ---
 
-`#cybersecurity` `#threatintelligence` `#malwareanalysis` `#yara` `#sigma` `#soc` `#dfir` `#infosec` `#osint` `#reverseengineering` `#steganography` `#virustotal` `#ghidra` `#docker` `#python` `#openSource` `#automation` `#mitre` `#attackframework` `#secops` `#blueTeam` `#incidentResponse` `#siem` `#edr` `#ioc` `#pwndoc` `#groq` `#llm` `#aiSecurity`
+`#cybersecurity` `#threatintelligence` `#malwareanalysis` `#yara` `#sigma` `#soc` `#dfir` `#infosec` `#osint` `#reverseengineering` `#steganography` `#virustotal` `#ghidra` `#docker` `#typescript` `#langgraph` `#openrouter` `#openSource` `#automation` `#mitre` `#attackframework` `#secops` `#blueTeam` `#incidentResponse` `#siem` `#edr` `#ioc` `#pwndoc` `#llm` `#aiSecurity`
 
 </div>

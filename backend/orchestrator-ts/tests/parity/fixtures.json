@@ -1,0 +1,185 @@
+{
+  "_note": "Shared deterministic fixtures for the Step 11 Python-vs-TypeScript replay. Analyzer results are synthetic and identical on both sides; only pipeline orchestration, download selection, reports, and API shape are under comparison.",
+  "results": {
+    "web": {
+      "findings": [
+        {
+          "type": "embedded_payload",
+          "detail": "The page references a downloadable executable.",
+          "severity": "medium",
+          "evidence": "https://payload.example/dropper.exe"
+        },
+        {
+          "type": "missing_security_header",
+          "detail": "Missing security header: Content-Security-Policy",
+          "severity": "high",
+          "evidence": "Content-Security-Policy"
+        }
+      ],
+      "risk_score": 4.2,
+      "raw_output": "Web analysis for: https://start.example\npayload: https://payload.example/dropper.exe\nresolved IP: 8.8.8.8"
+    },
+    "recon": {
+      "findings": [
+        {
+          "type": "geolocation",
+          "detail": "IP geolocation: country=US, ISP=Example",
+          "severity": "info",
+          "evidence": "{\"country\": \"US\", \"isp\": \"Example\"}"
+        },
+        {
+          "type": "ioc_match",
+          "detail": "ThreatFox IOC match: SyntheticLoader (confidence: 90%)",
+          "severity": "critical",
+          "evidence": "{\"found\": true, \"malware\": \"SyntheticLoader\"}"
+        }
+      ],
+      "risk_score": 2.0,
+      "raw_output": "Recon analysis for: 8.8.8.8\nipapi: {\"country\": \"US\"}\ntalos: blacklisted=False"
+    },
+    "malware": {
+      "findings": [
+        {
+          "type": "av_detection",
+          "detail": "SyntheticEngine detects the payload as a dropper.",
+          "severity": "critical",
+          "evidence": "{\"engine\": \"SyntheticEngine\", \"result\": \"Trojan.Dropper\"}"
+        },
+        {
+          "type": "suspicious_imports",
+          "detail": "The binary imports process-injection APIs.",
+          "severity": "high",
+          "evidence": "VirtualAllocEx, WriteProcessMemory, CreateRemoteThread"
+        }
+      ],
+      "risk_score": 7.5,
+      "raw_output": "Malware analysis for downloaded payload\nVT: 42 malicious\nimports: VirtualAllocEx, WriteProcessMemory, CreateRemoteThread"
+    },
+    "macro": {
+      "findings": [
+        {
+          "type": "macro_malicious",
+          "detail": "2 VBA macro modules found; auto-execution and an embedded URL are present.",
+          "severity": "critical",
+          "evidence": "{\"auto_exec\": true, \"has_ioc\": true}"
+        },
+        {
+          "type": "macro_ioc",
+          "detail": "IOCs extracted from macros: https://payload.example/dropper.exe",
+          "severity": "high",
+          "evidence": "[\"https://payload.example/dropper.exe\"]"
+        }
+      ],
+      "risk_score": 9.5,
+      "raw_output": "VBA macros: 2 module(s), risk=malicious, flags=[auto_exec, has_ioc]\nIOCs:\n  https://payload.example/dropper.exe"
+    },
+    "steg": {
+      "findings": [
+        {
+          "type": "lsb_anomaly",
+          "detail": "LSB entropy is higher than expected for a photographic image.",
+          "severity": "medium",
+          "evidence": "chi-square=0.991"
+        },
+        {
+          "type": "metadata",
+          "detail": "Embedded comment contains a synthetic marker.",
+          "severity": "low",
+          "evidence": "SECFLOW_PARITY_MARKER"
+        }
+      ],
+      "risk_score": 6.0,
+      "raw_output": "Steg analysis: LSB chi-square=0.991\nmetadata: SECFLOW_PARITY_MARKER"
+    }
+  },
+  "scenarios": [
+    {
+      "name": "url-payload-download",
+      "input": { "kind": "target", "value": "https://start.example" },
+      "expectedAnalyzers": ["web", "malware"],
+      "decisions": [
+        { "action": "finish", "reasoning": "No further web target is useful." },
+        { "action": "finish", "reasoning": "The downloaded payload has been analyzed." }
+      ],
+      "download": {
+        "url": "https://payload.example/dropper.exe",
+        "contentType": "application/x-dosexec",
+        "extension": ".exe"
+      }
+    },
+    {
+      "name": "url-followup-recon",
+      "input": { "kind": "target", "value": "https://start.example" },
+      "expectedAnalyzers": ["web", "recon"],
+      "decisions": [
+        {
+          "action": "analyze_recon",
+          "target": "8.8.8.8",
+          "reasoning": "The page exposed a concrete IP address."
+        },
+        { "action": "finish", "reasoning": "The IP reputation is recorded." }
+      ]
+    },
+    {
+      "name": "ip-recon",
+      "input": { "kind": "target", "value": "8.8.8.8" },
+      "expectedAnalyzers": ["recon"],
+      "decisions": [{ "action": "finish", "reasoning": "No further action is useful." }]
+    },
+    {
+      "name": "domain-recon",
+      "input": { "kind": "target", "value": "recongraph.xyz" },
+      "expectedAnalyzers": ["recon"],
+      "decisions": [{ "action": "finish", "reasoning": "No further action is useful." }]
+    },
+    {
+      "name": "uploaded-docm",
+      "input": {
+        "kind": "file",
+        "displayName": "invoice.docm",
+        "suffix": ".docm",
+        "bytesHex": "d0cf11e0a1b11ae1c000000000000000000000000000000000"
+      },
+      "firstAnalyzer": "macro",
+      "mimeType": "application/vnd.ms-word.document.macroEnabled.12",
+      "magicOutput": "Composite Document File V2 Document",
+      "expectedAnalyzers": ["macro"],
+      "decisions": [{ "action": "finish", "reasoning": "No further action is useful." }]
+    },
+    {
+      "name": "uploaded-png",
+      "input": {
+        "kind": "file",
+        "displayName": "sample.png",
+        "suffix": ".png",
+        "bytesBase64": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+      },
+      "firstAnalyzer": "steg",
+      "mimeType": "image/png",
+      "magicOutput": "PNG image data",
+      "expectedAnalyzers": ["steg"],
+      "decisions": [{ "action": "finish", "reasoning": "No further action is useful." }]
+    },
+    {
+      "name": "unknown-string-recon",
+      "input": { "kind": "target", "value": "analyst_user" },
+      "expectedAnalyzers": ["recon"],
+      "decisions": [
+        {
+          "action": "analyze_recon",
+          "target": "analyst_user",
+          "reasoning": "The ambiguous string may be a username; use the recon footprint path."
+        },
+        { "action": "finish", "reasoning": "The footprint pass completed." }
+      ]
+    },
+    {
+      "name": "analyzer-error",
+      "input": { "kind": "target", "value": "8.8.8.8" },
+      "failAnalyzer": "recon",
+      "expectedAnalyzers": ["recon"],
+      "expectedDifference": "error_semantics",
+      "decisions": [{ "action": "finish", "reasoning": "The analyzer failed; stop." }]
+    }
+  ]
+}

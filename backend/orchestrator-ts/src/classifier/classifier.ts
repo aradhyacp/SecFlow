@@ -11,6 +11,14 @@ import { sniffFile } from "./sniff.js";
 const MAX_TARGET_LENGTH = 4_096;
 const HEAD_BYTES = 4_096;
 
+/** Printable, bounded file-head preview for the unknown-input model fallback. */
+function printableHead(bytes: Buffer): string {
+  return bytes
+    .toString("utf8")
+    .replace(/[^\t\n\r\x20-\x7e]/g, "\uFFFD")
+    .slice(0, HEAD_BYTES);
+}
+
 export interface ClassifiedInput {
   classification: Classification;
   inputType: InputType;
@@ -58,6 +66,7 @@ export async function classifyInput(input: ResolvedInput): Promise<ClassifiedInp
       analyzer: match?.analyzer ?? null,
       mimeType,
       magicOutput: signature.magicOutput,
+      ...(bytes.length > 0 ? { fileHead: printableHead(bytes) } : {}),
       deterministic: match !== null,
       ...(match?.reason
         ? { reasoning: match.reason }

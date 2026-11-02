@@ -50,7 +50,7 @@ function severityForTool(
 
 /**
  * Translate a steg-analyzer result payload into the SecFlow contract.
- * Mirrors backend/orchestrator/app/adapters/steg_adapter.py.
+ * Ports the retired Python steg adapter.
  */
 export function adaptSteg(payload: unknown): AdaptedAnalyzerResult {
   const findings: SecFlowFinding[] = [];

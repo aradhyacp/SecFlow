@@ -273,7 +273,7 @@ const ADAPTERS: Record<string, Adapter> = {
 
 /**
  * Translate aggregated web-analyzer endpoint responses into the SecFlow
- * contract. Mirrors backend/orchestrator/app/adapters/web_adapter.py.
+ * contract. Ports the retired Python web adapter.
  */
 export function adaptWeb(aggregated: unknown, inputDisplayName: string): AdaptedAnalyzerResult {
   const record = asRecord(aggregated);

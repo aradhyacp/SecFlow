@@ -1,10 +1,16 @@
 # SecFlow — Project Details
 
+> **Implementation status:** the active orchestrator is the TypeScript/LangGraph
+> service in `backend/orchestrator-ts/`, using OpenRouter. The analyzer services
+> remain Python/Flask. This document describes the product design; where an
+> older implementation detail is mentioned below, the current source code and
+> [docs/architecture.md](docs/architecture.md) take precedence.
+
 ## 1. Overview
 
 **SecFlow** is a fully automated, end-to-end threat analysis pipeline with integrated PWNDoc reporting. It targets security analysts and SOC teams who currently deal with fragmented tooling, manually correlating data from multiple sources to investigate threats. This fragmentation slows incident response and increases the risk of missing critical indicators.
 
-SecFlow solves this by accepting any input — file, URL, IP, domain, or image — and routing it through specialized analyzers via an intelligent AI-driven Pipeline Orchestrator. Findings from all analyzers are aggregated and rendered into a single, industry-grade PWNDoc report (JSON / PDF / HTML), giving analysts instant visibility into threats, risk scores, and actionable recommendations.
+SecFlow solves this by accepting any input — file, URL, IP, domain, or image — and routing it through specialized analyzers via an intelligent AI-driven Pipeline Orchestrator. Findings from all analyzers are aggregated and rendered into a single, industry-grade PWNDoc report (JSON / HTML, with browser print-to-PDF), giving analysts instant visibility into threats, risk scores, and actionable recommendations.
 
 **Theme Alignment:** Threat Detection and Incident Response.
 
@@ -22,13 +28,13 @@ SecFlow operates as an automated analysis factory:
 | **Classification** | File type is identified; determines the first analyzer to invoke |
 | **Analyzer Loop** | Analyzers are called iteratively (3–5 passes) guided by AI tool-calling |
 | **Findings Store** | Outputs from every analyzer pass are accumulated in a persistent findings store |
-| **Report Generation** | Aggregated findings are formatted by AI into a PWNDoc report (JSON / PDF / HTML) |
+| **Report Generation** | Aggregated findings are formatted by AI into a PWNDoc report (JSON / HTML) |
 
 ---
 
 ## 3. Analyzers
 
-SecFlow has four specialized analyzers. They can be used individually or as part of the full automated pipeline.
+SecFlow has five specialized analyzers. They can be used individually or as part of the full automated pipeline.
 
 | Analyzer | Primary Input | What It Does |
 |---|---|---|
@@ -45,21 +51,22 @@ SecFlow has four specialized analyzers. They can be used individually or as part
 
 On the very first pass, SecFlow avoids AI overhead by using deterministic rules:
 
-- **Tool used:** `file` command + `python-magic` library
+- **Tool used:** magic-byte sniffing + MIME/extension rules in the TypeScript classifier
 - **Rules example:**
   - Image (PNG, JPG, BMP…) → invoke **Steg Analyzer**
-  - Executable / PE binary → invoke **Malware Analyzer**
+  - Office/RTF document → invoke **Macro Analyzer**
+  - Executable / PE / ELF / Mach-O binary → invoke **Malware Analyzer**
   - URL string → invoke **Web Analyzer**
-  - IP / domain string → invoke **Recon Analyzer**
-- **Unknown type fallback:** Pass `file`/`python-magic` output + first 100 lines (`head -100`) into **Gemini AI** to determine the first analyzer.
+  - IP / domain / email / phone string → invoke **Recon Analyzer**
+- **Unknown type fallback:** expose the applicable analyzer tools to the model and include a bounded, untrusted file-head preview in the decision prompt.
 
 ### 4.2 AI-Driven Loop (Subsequent Passes)
 
-After each analyzer run, the output is fed into Gemini AI, which decides the next analyzer to call based on what was found. This is **AI tool-calling** — Gemini acts as an orchestrator that selects the next tool/worker.
-
-**Fallback within AI decision:**
-- If Gemini lacks enough context → pass the full analyzer output to Gemini
-- If output is too noisy → grep through a predefined keyword list; pass matched snippets into Gemini for a focused decision
+After each analyzer run, bounded findings and evidence references are passed to
+the configured OpenRouter model, which selects the next validated analyzer tool
+(`targetId` only) or returns `finish`. The model cannot supply arbitrary URLs,
+paths, commands, or analyzer endpoints. Evidence comes from the run-scoped
+raw-output store rather than unbounded dumps.
 
 ### 4.3 Loop Termination
 
@@ -82,7 +89,7 @@ Pass 3 → AI sees IP/HTTP → calls Web Analyzer
 
 Loop ends (3 passes reached / no more signals).
 
-Report generated from all 3 passes → PWNDoc (JSON + PDF + HTML)
+Report generated from all 3 passes → PWNDoc (JSON + HTML, PDF via browser print)
 ```
 
 ---
@@ -96,9 +103,9 @@ All analyzer outputs and intermediate AI decisions are written to a **persistent
 ## 6. Report Generation (PWNDoc)
 
 At the end of the loop:
-1. Aggregated findings from the store are passed to Gemini AI.
-2. Gemini formats the findings into a structured PWNDoc-compatible report.
-3. Output formats: **JSON**, **PDF**, **HTML**.
+1. Aggregated findings from graph state are passed to the OpenRouter model.
+2. The model formats narrative text into a structured PWNDoc-compatible report.
+3. Output formats: **JSON**, **HTML** (PDF via the report's browser print button).
 
 The report includes:
 - Threat summary per analyzer
@@ -114,14 +121,14 @@ The report includes:
 |---|---|
 | **Service Orchestration** | Docker, Docker Compose |
 | **API Framework** | Flask (Python 3.11+) |
-| **File Classification** | `file` (system command), `python-magic` |
-| **AI Orchestration** | Google Gemini API (tool-calling) |
+| **File Classification** | Magic bytes + MIME/extension rules (TypeScript) |
+| **AI Orchestration** | OpenRouter via Vercel AI SDK + LangGraph.js |
 | **Malware Analysis** | Analyzer microservice — YARA, pefile, strings, hashlib |
 | **Steganography** | Analyzer microservice — binwalk, zsteg, steghide, ExifTool |
 | **Reconnaissance** | Analyzer microservice — nmap, WHOIS, dnspython, Shodan |
 | **URL Analysis** | Analyzer microservice — internal only, no public route |
 | **Web Vulnerability** | Analyzer microservice — requests, Wappalyzer |
-| **Reporting** | PWNDoc — fpdf2 (PDF), Jinja2 (HTML), JSON |
+| **Reporting** | PWNDoc — self-contained HTML + JSON (browser print-to-PDF) |
 | **Frontend** | TBD (planned for later phase) |
 
 ---

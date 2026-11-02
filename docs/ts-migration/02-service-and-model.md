@@ -6,7 +6,8 @@
 
 ## 1. Service layout
 
-New service: `backend/orchestrator-ts/` (runs alongside the Python orchestrator until Step 11).
+Active service: `backend/orchestrator-ts/`. It replaced the Python
+orchestrator in Step 11; see [11-cutover.md](11-cutover.md).
 
 ```
 src/

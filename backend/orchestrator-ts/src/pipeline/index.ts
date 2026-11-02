@@ -20,6 +20,10 @@ import {
   SsrfBlockedError,
   type NetworkGuard,
 } from "../security/networkGuard.js";
+import {
+  HttpPayloadDownloader,
+  type PayloadDownloader,
+} from "./payloadDownloader.js";
 import type { AnalysisRequest, AnalysisResponse, AnalysisRunner, ResolvedInput } from "./types.js";
 
 export interface RunnerDependencies {
@@ -31,6 +35,8 @@ export interface RunnerDependencies {
   reportModel?: ModelClient | null;
   rawOutputStore?: RawOutputStore;
   guard?: NetworkGuard;
+  /** `null` disables download-and-analyze; tests use this to stay offline. */
+  payloadDownloader?: PayloadDownloader | null;
   modelFactory?: ModelFactory;
   now?: () => Date;
 }
@@ -146,10 +152,16 @@ export function createAnalysisRunner(
       const runId = normalizeRunId(request.runId);
       const runLogger = request.logger.child({ runId });
       let jobId = "";
+      let payloadDownloader: PayloadDownloader | undefined;
 
       try {
         const { model, guard } = buildShared();
         const registry = registryForRun(model, guard, runLogger);
+        payloadDownloader =
+          dependencies.payloadDownloader === null
+            ? undefined
+            : (dependencies.payloadDownloader ??
+              new HttpPayloadDownloader({ logger: runLogger }));
         jobId = await hashInput(request.input);
 
         runLogger.info(
@@ -176,6 +188,7 @@ export function createAnalysisRunner(
           decisionMaxOutputTokens: config.model.maxTokens,
           rawOutputStore: dependencies.rawOutputStore ?? new InMemoryRawOutputStore(),
           guard,
+          ...(payloadDownloader ? { payloadDownloader } : {}),
           logger: runLogger,
           signal: request.signal,
         });
@@ -282,6 +295,8 @@ export function createAnalysisRunner(
           "analysis run failed",
         );
         throw normalized;
+      } finally {
+        await payloadDownloader?.cleanup();
       }
     },
   };

@@ -8,7 +8,7 @@ export const DECISION_SYSTEM_PROMPT = [
   "You are the SecFlow analysis decision engine for an automated threat-analysis pipeline.",
   "ROLE: choose at most one next analysis action, or explicitly finish the run.",
   "OBJECTIVE: resolve the current target with the fewest useful analyzer passes, following only concrete evidence.",
-  "TOOL SELECTION: use file analyzers only for file targets, recon only for IP/domain/email/phone/username targets, web only for URL targets, and macro/malware/steg according to the file subtype.",
+  "TOOL SELECTION: use file analyzers only for file targets, recon only for IP/domain/email/phone/username/unknown-string targets, web only for URL targets, and macro/malware/steg according to the file subtype.",
   "EVIDENCE REQUIREMENTS: choose an action only when the latest normalized evidence or target catalog gives a concrete reason. Do not invent a target, indicator, path, URL, command, or service.",
   "OUTPUT CONSTRAINTS: return exactly one structured decision. The action must be one of the enumerated choices; targetId must be one of the target ids listed in the user prompt.",
   "TERMINATION: choose finish when no new concrete evidence justifies another pass, when a duplicate would occur, or when no action is relevant.",
@@ -93,7 +93,19 @@ function untrustedEvidence(state: AnalysisState): string {
           .join("\n")
       : "- none";
 
+  const classificationPreview = [
+    state.classification.magicOutput
+      ? `magic: ${state.classification.magicOutput}`
+      : undefined,
+    state.classification.fileHead ? `file head:\n${state.classification.fileHead}` : undefined,
+  ]
+    .filter((value): value is string => value !== undefined)
+    .join("\n");
+
   return [
+    ...(classificationPreview
+      ? ["## Classification preview", classificationPreview, ""]
+      : []),
     "## Target labels",
     targetLabels || "- none",
     "",
@@ -159,8 +171,9 @@ export function buildDecisionPrompt(input: DecisionPromptInput): string {
     "## Tool selection criteria",
     "- Select only an action/target pair listed under Available actions.",
     "- Prefer an action that follows a concrete indicator or unresolved question in the latest evidence.",
-    "- Use file analyzers only for file targets, recon for IP/domain/email/phone/username, and web for URL targets.",
+    "- Use file analyzers only for file targets, recon for IP/domain/email/phone/username/unknown strings, and web for URL targets.",
     "- Choose macro for macro-enabled Office/RTF documents, malware for PE/ELF/Mach-O, and steg for image targets.",
+    "- If an uploaded file's subtype is ambiguous, a listed file analyzer may still be tried; use the file head as evidence.",
     "- Do not run an analyzer merely to repeat a clean result that is already recorded.",
     "- Do not repeat a tool/target pair shown in Tool history.",
     "",
